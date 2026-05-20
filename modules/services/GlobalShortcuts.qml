@@ -90,7 +90,10 @@ QtObject {
             const targetMonitor = screenName ? AxctlService.monitorFor(screenName) : AxctlService.focusedMonitor;
             GlobalStates.settingsTargetWorkspaceId = targetMonitor?.activeWorkspace?.id || AxctlService.focusedMonitor?.activeWorkspace?.id || AxctlService.focusedWorkspace?.id || 0;
             GlobalStates.settingsTargetScreenName = targetMonitor?.name || AxctlService.focusedMonitor?.name || "";
-            Visibilities.setActiveModule("");
+            if (targetMonitor && targetMonitor.id !== AxctlService.focusedMonitor?.id) {
+                AxctlService.dispatch(`focusmonitor ${targetMonitor.id}`);
+            }
+            Qt.callLater(() => Visibilities.setActiveModule(""));
         }
         GlobalStates.settingsWindowVisible = willOpen;
     }
