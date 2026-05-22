@@ -5,7 +5,6 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import Quickshell.Widgets
-import Quickshell.Io
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
@@ -113,28 +112,15 @@ Item {
         return workspaceGroup * Config.workspaces.shown + index + 1;
     }
 
-    // Bypass para AxctlService.dispatch — está roto en algunos setups:
-    // devuelve "Success" pero Hyprland no cambia de workspace.
-    // hyprctl directo funciona siempre.
     function switchToWorkspace(id) {
-        switchProc.command = ["hyprctl", "dispatch", "workspace", String(id)];
-        switchProc.running = false;
-        switchProc.running = true;
+        AxctlService.dispatch(`workspace ${id}`);
     }
     function moveWindowToWorkspace(id) {
-        moveProc.command = ["hyprctl", "dispatch", "movetoworkspace", String(id)];
-        moveProc.running = false;
-        moveProc.running = true;
+        AxctlService.dispatch(`movetoworkspace ${id}`);
     }
     function toggleSpecialWorkspace() {
-        specialProc.command = ["hyprctl", "dispatch", "togglespecialworkspace"];
-        specialProc.running = false;
-        specialProc.running = true;
+        AxctlService.dispatch(`togglespecialworkspace`);
     }
-
-    Process { id: switchProc }
-    Process { id: moveProc }
-    Process { id: specialProc }
 
     Timer {
         id: updateTimer

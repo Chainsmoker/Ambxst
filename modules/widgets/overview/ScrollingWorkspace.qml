@@ -5,7 +5,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
 import Quickshell
-import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Wayland
 import qs.modules.globals
@@ -267,13 +266,10 @@ Item {
             TapHandler {
                 acceptedButtons: Qt.LeftButton
                 onTapped: {
-                    switchProc.command = ["hyprctl", "dispatch", "workspace", String(root.workspaceId)];
-                    switchProc.running = false;
-                    switchProc.running = true;
+                    AxctlService.dispatch(`workspace ${root.workspaceId}`);
                     Visibilities.setActiveModule("", true);
                 }
             }
-            Process { id: switchProc }
 
             Repeater {
                 model: root.workspaceWindows
