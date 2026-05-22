@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import qs.modules.globals
 import qs.modules.theme
 import qs.modules.services
 import qs.modules.components
@@ -100,12 +101,12 @@ PanelWindow {
                 // Lista de iconos — por ahora visual
                 Repeater {
                     model: [
-                        { icon: Icons.robot,     label: "Chat" },
-                        { icon: Icons.note,      label: "Audio" },
-                        { icon: Icons.wifiHigh,  label: "Red" },
-                        { icon: Icons.bluetooth, label: "Bluetooth" },
-                        { icon: Icons.sun,       label: "Brillo" },
-                        { icon: Icons.gear,      label: "Sistema" }
+                        { id: "chat",      icon: Icons.robot,     label: "Chat" },
+                        { id: "audio",     icon: Icons.note,      label: "Audio" },
+                        { id: "wifi",      icon: Icons.wifiHigh,  label: "Red" },
+                        { id: "bluetooth", icon: Icons.bluetooth, label: "Bluetooth" },
+                        { id: "brightness",icon: Icons.sun,       label: "Brillo" },
+                        { id: "settings",  icon: Icons.gear,      label: "Sistema" }
                     ]
 
                     delegate: Item {
@@ -114,12 +115,16 @@ PanelWindow {
                         Layout.preferredWidth: 40
                         Layout.preferredHeight: 40
 
+                        readonly property bool isActive: modelData.id === "chat" && GlobalStates.chatPanelOpen
+
                         Rectangle {
                             anchors.fill: parent
                             radius: Styling.radius(10)
-                            color: iconMouse.containsMouse
-                                   ? Qt.alpha(Colors.primary, 0.18)
-                                   : "transparent"
+                            color: parent.isActive
+                                   ? Colors.primary
+                                   : (iconMouse.containsMouse
+                                      ? Qt.alpha(Colors.primary, 0.18)
+                                      : "transparent")
                             Behavior on color {
                                 enabled: Config.animDuration > 0
                                 ColorAnimation { duration: Config.animDuration / 2 }
@@ -131,7 +136,9 @@ PanelWindow {
                             text: parent.modelData.icon
                             font.family: Icons.font
                             font.pixelSize: 20
-                            color: Colors.overBackground
+                            color: parent.isActive
+                                   ? Styling.srItem("overprimary")
+                                   : Colors.overBackground
                         }
 
                         MouseArea {
@@ -140,8 +147,12 @@ PanelWindow {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                // TODO: cada icono dispara su acción
-                                console.log("SideNotch click:", parent.modelData.label);
+                                if (parent.modelData.id === "chat") {
+                                    GlobalStates.chatPanelOpen = !GlobalStates.chatPanelOpen;
+                                } else {
+                                    // TODO: otros iconos
+                                    console.log("SideNotch click:", parent.modelData.label);
+                                }
                             }
                         }
                     }

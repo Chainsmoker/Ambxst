@@ -53,6 +53,9 @@ Singleton {
     // ═══════════════════════════════════════════════════════════════
     property string compositorLayout: ""
     property bool compositorLayoutReady: false
+
+    // Side notch chat panel
+    property bool chatPanelOpen: false
     readonly property var availableLayouts: ["dwindle", "master", "scrolling"]
 
     Process {

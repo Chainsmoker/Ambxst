@@ -181,6 +181,22 @@ ShellRoot {
         }
     }
 
+    // ChatPanel — abre al click del icono "chat" del side notch
+    Variants {
+        model: {
+            const screens = Quickshell.screens;
+            const list = (Config.bar && Config.bar.screenList !== undefined ? Config.bar.screenList : []);
+            if (!list || list.length === 0)
+                return screens;
+            return screens.filter(screen => list.indexOf(screen.name) !== -1);
+        }
+
+        ChatPanel {
+            required property ShellScreen modelData
+            screen: modelData
+        }
+    }
+
     // Secure WlSessionLock lockscreen
     WlSessionLock {
         id: sessionLock
