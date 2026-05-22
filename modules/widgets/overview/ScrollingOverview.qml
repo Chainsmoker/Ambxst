@@ -101,6 +101,12 @@ Item {
             selectedMatchIndex = 0;
             return;
         }
+        // Guardamos la ventana seleccionada antes de re-filtrar para no
+        // perder la posición cuando windowList se actualiza (por ej. al mover
+        // el mouse con follow_mouse=1).
+        const prevSelectedAddr = (matchingWindows.length > 0 && selectedMatchIndex >= 0)
+            ? matchingWindows[selectedMatchIndex]?.address
+            : null;
         const query = searchQuery.toLowerCase();
         const matches = windowList.filter(win => {
             if (!win)
@@ -113,7 +119,13 @@ Item {
                     score: Math.max(fuzzyScore(query, (win.title || "").toLowerCase()), fuzzyScore(query, (win.class || "").toLowerCase()))
                 })).sort((a, b) => b.score - a.score).map(item => item.window);
         matchingWindows = matches;
-        selectedMatchIndex = matches.length > 0 ? 0 : -1;
+        // Intentar mantener la selección previa si la ventana sigue en los matches
+        if (prevSelectedAddr) {
+            const newIdx = matches.findIndex(w => w?.address === prevSelectedAddr);
+            selectedMatchIndex = newIdx >= 0 ? newIdx : (matches.length > 0 ? 0 : -1);
+        } else {
+            selectedMatchIndex = matches.length > 0 ? 0 : -1;
+        }
     }
 
     function navigateToSelectedWindow() {
@@ -213,14 +225,8 @@ Item {
     readonly property int activeWorkspaceId: monitor?.activeWorkspace?.id || 1
     readonly property real workspaceRowHeight: workspaceHeight + workspaceSpacing
 
-    // Scroll to center active workspace cuando ACTUALMENTE cambia (no en re-evaluaciones)
-    property int _lastScrolledWs: -1
-    onActiveWorkspaceIdChanged: {
-        if (activeWorkspaceId !== _lastScrolledWs) {
-            _lastScrolledWs = activeWorkspaceId;
-            workspaceFlickable.scrollToActiveWorkspace();
-        }
-    }
+    // Scroll to center active workspace when it changes
+    onActiveWorkspaceIdChanged: workspaceFlickable.scrollToActiveWorkspace()
 
     // Vertical flickable containing all workspaces
     Flickable {
