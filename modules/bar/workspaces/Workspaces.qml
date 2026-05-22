@@ -416,12 +416,28 @@ Item {
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillHeight: true
                 onPressed: AxctlService.dispatch(`workspace ${workspaceValue}`)
+                onClicked: AxctlService.dispatch(`workspace ${workspaceValue}`)
                 width: workspaceButtonWidth
 
                 background: Item {
                     id: workspaceButtonBackground
                     implicitWidth: workspaceButtonWidth
                     implicitHeight: workspaceButtonWidth
+
+                    // Fallback explícito por si algo intercepta los clicks del Button
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.MiddleButton) {
+                                AxctlService.dispatch(`movetoworkspace ${button.workspaceValue}`);
+                            } else {
+                                AxctlService.dispatch(`workspace ${button.workspaceValue}`);
+                            }
+                        }
+                        z: 10
+                    }
                     property var focusedWindow: {
                         const windowsInThisWorkspace = CompositorData.workspaceWindowsMap[button.workspaceValue] || [];
                         if (windowsInThisWorkspace.length === 0)
@@ -553,12 +569,28 @@ Item {
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillWidth: true
                 onPressed: AxctlService.dispatch(`workspace ${workspaceValue}`)
+                onClicked: AxctlService.dispatch(`workspace ${workspaceValue}`)
                 height: workspaceButtonWidth
 
                 background: Item {
                     id: workspaceButtonBackgroundVert
                     implicitWidth: workspaceButtonWidth
                     implicitHeight: workspaceButtonWidth
+
+                    // Fallback explícito por si algo intercepta los clicks del Button
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.MiddleButton) {
+                                AxctlService.dispatch(`movetoworkspace ${buttonVert.workspaceValue}`);
+                            } else {
+                                AxctlService.dispatch(`workspace ${buttonVert.workspaceValue}`);
+                            }
+                        }
+                        z: 10
+                    }
                     property var focusedWindow: {
                         const windowsInThisWorkspace = CompositorData.workspaceWindowsMap[buttonVert.workspaceValue] || [];
                         if (windowsInThisWorkspace.length === 0)

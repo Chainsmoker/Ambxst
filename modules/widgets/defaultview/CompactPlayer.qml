@@ -180,12 +180,13 @@ Item {
             MultiEffect {
                 anchors.fill: backgroundArt
                 source: backgroundArt
-                // Only enable blur when there's content to blur (saves GPU)
-                blurEnabled: hasArtwork || wallpaperPath !== ""
+                // Solo mostrar el blur cuando el player está expandido (playing/hover).
+                // Si está en modo "texto" no queremos ver el favicon de Brave o lo que sea.
+                blurEnabled: (hasArtwork || wallpaperPath !== "") && compactPlayer.playerExpanded
                 blurMax: 32
                 blur: 0.75
                 autoPaddingEnabled: false
-                opacity: (hasArtwork || wallpaperPath !== "") ? 1.0 : 0.0
+                opacity: ((hasArtwork || wallpaperPath !== "") && compactPlayer.playerExpanded) ? 1.0 : 0.0
                 Behavior on opacity {
                     enabled: Config.animDuration > 0
                     NumberAnimation {
@@ -198,7 +199,7 @@ Item {
             StyledRect {
                 anchors.fill: parent
                 variant: "internalbg"
-                opacity: (hasArtwork || wallpaperPath !== "") ? 0.5 : 0.0
+                opacity: ((hasArtwork || wallpaperPath !== "") && compactPlayer.playerExpanded) ? 0.5 : 0.0
                 radius: Styling.radius(-4)
                 Behavior on opacity {
                     enabled: Config.animDuration > 0
