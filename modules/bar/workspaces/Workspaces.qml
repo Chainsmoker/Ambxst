@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import Quickshell.Widgets
+import Quickshell.Io
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
@@ -112,6 +113,26 @@ Item {
         return workspaceGroup * Config.workspaces.shown + index + 1;
     }
 
+    // Bypass para AxctlService.dispatch — está roto en algunos setups:
+    // devuelve "Success" pero Hyprland no cambia de workspace.
+    // hyprctl directo funciona siempre.
+    function switchToWorkspace(id) {
+        switchProc.command = ["hyprctl", "dispatch", "workspace", String(id)];
+        switchProc.running = true;
+    }
+    function moveWindowToWorkspace(id) {
+        moveProc.command = ["hyprctl", "dispatch", "movetoworkspace", String(id)];
+        moveProc.running = true;
+    }
+    function toggleSpecialWorkspace() {
+        specialProc.command = ["hyprctl", "dispatch", "togglespecialworkspace"];
+        specialProc.running = true;
+    }
+
+    Process { id: switchProc }
+    Process { id: moveProc }
+    Process { id: specialProc }
+
     Timer {
         id: updateTimer
         interval: 100
@@ -167,9 +188,9 @@ Item {
     WheelHandler {
         onWheel: event => {
             if (event.angleDelta.y < 0)
-                AxctlService.dispatch(`workspace r+1`);
+                workspacesWidget.switchToWorkspace("r+1");
             else if (event.angleDelta.y > 0)
-                AxctlService.dispatch(`workspace r-1`);
+                workspacesWidget.switchToWorkspace("r-1");
         }
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     }
@@ -179,7 +200,7 @@ Item {
         acceptedButtons: Qt.BackButton
         onPressed: event => {
             if (event.button === Qt.BackButton) {
-                AxctlService.dispatch(`togglespecialworkspace`);
+                workspacesWidget.toggleSpecialWorkspace();
             }
         }
     }
@@ -415,9 +436,8 @@ Item {
                 id: button
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillHeight: true
-                onPressed: AxctlService.dispatch(`workspace ${workspaceValue}`)
-                onClicked: AxctlService.dispatch(`workspace ${workspaceValue}`)
                 width: workspaceButtonWidth
+                // El handler real está en el MouseArea del background (axctl roto).
 
                 background: Item {
                     id: workspaceButtonBackground
@@ -431,9 +451,9 @@ Item {
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                         onClicked: mouse => {
                             if (mouse.button === Qt.MiddleButton) {
-                                AxctlService.dispatch(`movetoworkspace ${button.workspaceValue}`);
+                                workspacesWidget.moveWindowToWorkspace(button.workspaceValue);
                             } else {
-                                AxctlService.dispatch(`workspace ${button.workspaceValue}`);
+                                workspacesWidget.switchToWorkspace(button.workspaceValue);
                             }
                         }
                         z: 10
@@ -568,9 +588,8 @@ Item {
                 id: buttonVert
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillWidth: true
-                onPressed: AxctlService.dispatch(`workspace ${workspaceValue}`)
-                onClicked: AxctlService.dispatch(`workspace ${workspaceValue}`)
                 height: workspaceButtonWidth
+                // El handler real está en el MouseArea del background (axctl roto).
 
                 background: Item {
                     id: workspaceButtonBackgroundVert
@@ -584,9 +603,9 @@ Item {
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                         onClicked: mouse => {
                             if (mouse.button === Qt.MiddleButton) {
-                                AxctlService.dispatch(`movetoworkspace ${buttonVert.workspaceValue}`);
+                                workspacesWidget.moveWindowToWorkspace(buttonVert.workspaceValue);
                             } else {
-                                AxctlService.dispatch(`workspace ${buttonVert.workspaceValue}`);
+                                workspacesWidget.switchToWorkspace(buttonVert.workspaceValue);
                             }
                         }
                         z: 10
