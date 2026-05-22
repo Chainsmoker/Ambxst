@@ -84,8 +84,10 @@ Item {
     }
 
     readonly property string displayedTitle: {
-        if (player) {
-            return (player.trackArtist ? player.trackArtist + " - " : "") + (player.trackTitle || "Unknown");
+        // Solo usar metadata del player si tiene un trackTitle real
+        // (caso típico: Brave pausado expone player pero sin trackTitle → "Unknown")
+        if (player && player.trackTitle) {
+            return (player.trackArtist ? player.trackArtist + " - " : "") + player.trackTitle;
         }
         return focusedTitle || noMediaText;
     }
