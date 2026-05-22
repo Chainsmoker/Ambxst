@@ -34,12 +34,18 @@ PanelWindow {
     readonly property int headerHeight: 150
     readonly property int sectionSpacing: 10
 
-    readonly property int barReserved: {
+    // Altura del bar superior (para overlap visual con la barra)
+    readonly property int barHeight: {
         const enabled = (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true);
         if (!enabled) return 0;
         const base = (Config.showBackground !== false) ? 44 : 40;
         return Config.bar?.position === "top" ? base : 0;
     }
+    // Margen externo del bar (gap del bar al borde de pantalla)
+    readonly property int barOuterMargin: 4
+    readonly property int notchCurveSize: Math.max(Styling.radius(8), 12)
+    // El dock arranca desde arriba — el bar (layer Overlay) flota encima
+    readonly property int barReserved: 0
 
     implicitWidth: dockWidth + 32
 
@@ -49,10 +55,11 @@ PanelWindow {
 
     Item {
         id: panelMask
-        x: dock.width - dock.dockWidth
-        y: dock.barReserved
-        width: dock.isOpen ? dock.dockWidth : 0
-        height: dock.isOpen ? (dock.height - dock.barReserved) : 0
+        // Incluir el curve-notch a la izquierda del dock
+        x: dock.width - dock.dockWidth - dock.notchCurveSize
+        y: 0
+        width: dock.isOpen ? (dock.dockWidth + dock.notchCurveSize) : 0
+        height: dock.isOpen ? dock.height : 0
         visible: false
     }
 
@@ -84,22 +91,65 @@ PanelWindow {
             }
         }
 
+        // Fondo único: arranca desde y=0 para fundirse con el bar superior.
+        // Usa "barbg" para matchear EXACTAMENTE el color del bar (surfaceDim vs background).
         StyledRect {
             id: dockBg
             anchors.fill: parent
-            variant: "bg"
+            variant: "barbg"
             enableShadow: true
             radius: 0
-            topLeftRadius: Styling.radius(8)
+            topLeftRadius: 0
             bottomLeftRadius: Styling.radius(8)
             topRightRadius: 0
             bottomRightRadius: 0
             clip: true
         }
 
+        // ── Curva tipo dashboard donde el bar se conecta al dock ──
+        // A la izquierda del dock, justo bajo el bar: extiende el fondo del dock
+        // hacia la izquierda con un arco cóncavo, simulando un notch que sale del bar.
+        Item {
+            id: notchCurveLeft
+            width: dock.notchCurveSize
+            height: dock.notchCurveSize
+            x: -dock.notchCurveSize
+            y: dock.barHeight - dock.barOuterMargin
+            visible: dock.barHeight > 0
+
+            Canvas {
+                id: notchCanvas
+                anchors.fill: parent
+                antialiasing: true
+
+                function paintCorner() { requestPaint(); }
+                Component.onCompleted: requestPaint()
+
+                onPaint: {
+                    var ctx = getContext("2d");
+                    var w = width;
+                    ctx.clearRect(0, 0, w, height);
+                    // L sólida en bottom-right; arco cóncavo desde top-right → bottom-left
+                    // centrado en (0,0): "muerde" el cuadrante top-left
+                    ctx.beginPath();
+                    ctx.moveTo(w, w);
+                    ctx.lineTo(w, 0);
+                    ctx.arc(0, 0, w, 0, Math.PI / 2, false);
+                    ctx.closePath();
+                    ctx.fillStyle = Colors.surfaceDim;
+                    ctx.fill();
+                }
+            }
+            Connections {
+                target: Colors
+                function onSurfaceDimChanged() { notchCanvas.requestPaint(); }
+            }
+        }
+
         ScrollView {
             id: scroller
             anchors.fill: parent
+            anchors.topMargin: dock.barHeight
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
