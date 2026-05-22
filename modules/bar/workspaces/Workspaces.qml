@@ -118,14 +118,17 @@ Item {
     // hyprctl directo funciona siempre.
     function switchToWorkspace(id) {
         switchProc.command = ["hyprctl", "dispatch", "workspace", String(id)];
+        switchProc.running = false;
         switchProc.running = true;
     }
     function moveWindowToWorkspace(id) {
         moveProc.command = ["hyprctl", "dispatch", "movetoworkspace", String(id)];
+        moveProc.running = false;
         moveProc.running = true;
     }
     function toggleSpecialWorkspace() {
         specialProc.command = ["hyprctl", "dispatch", "togglespecialworkspace"];
+        specialProc.running = false;
         specialProc.running = true;
     }
 
@@ -432,32 +435,32 @@ Item {
         Repeater {
             model: effectiveWorkspaceCount
 
-            Button {
+            Item {
                 id: button
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillHeight: true
+                Layout.preferredWidth: workspaceButtonWidth
                 width: workspaceButtonWidth
-                // El handler real está en el MouseArea del background (axctl roto).
+                height: workspaceButtonWidth
 
-                background: Item {
-                    id: workspaceButtonBackground
-                    implicitWidth: workspaceButtonWidth
-                    implicitHeight: workspaceButtonWidth
-
-                    // Fallback explícito por si algo intercepta los clicks del Button
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                        onClicked: mouse => {
-                            if (mouse.button === Qt.MiddleButton) {
-                                workspacesWidget.moveWindowToWorkspace(button.workspaceValue);
-                            } else {
-                                workspacesWidget.switchToWorkspace(button.workspaceValue);
-                            }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                    hoverEnabled: true
+                    onClicked: mouse => {
+                        if (mouse.button === Qt.MiddleButton) {
+                            workspacesWidget.moveWindowToWorkspace(button.workspaceValue);
+                        } else {
+                            workspacesWidget.switchToWorkspace(button.workspaceValue);
                         }
-                        z: 10
                     }
+                    z: 10
+                }
+
+                Item {
+                    id: workspaceButtonBackground
+                    anchors.fill: parent
                     property var focusedWindow: {
                         const windowsInThisWorkspace = CompositorData.workspaceWindowsMap[button.workspaceValue] || [];
                         if (windowsInThisWorkspace.length === 0)
@@ -584,32 +587,32 @@ Item {
         Repeater {
             model: effectiveWorkspaceCount
 
-            Button {
+            Item {
                 id: buttonVert
                 property int workspaceValue: getWorkspaceId(index)
                 Layout.fillWidth: true
+                Layout.preferredHeight: workspaceButtonWidth
+                width: workspaceButtonWidth
                 height: workspaceButtonWidth
-                // El handler real está en el MouseArea del background (axctl roto).
 
-                background: Item {
-                    id: workspaceButtonBackgroundVert
-                    implicitWidth: workspaceButtonWidth
-                    implicitHeight: workspaceButtonWidth
-
-                    // Fallback explícito por si algo intercepta los clicks del Button
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                        onClicked: mouse => {
-                            if (mouse.button === Qt.MiddleButton) {
-                                workspacesWidget.moveWindowToWorkspace(buttonVert.workspaceValue);
-                            } else {
-                                workspacesWidget.switchToWorkspace(buttonVert.workspaceValue);
-                            }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                    hoverEnabled: true
+                    onClicked: mouse => {
+                        if (mouse.button === Qt.MiddleButton) {
+                            workspacesWidget.moveWindowToWorkspace(buttonVert.workspaceValue);
+                        } else {
+                            workspacesWidget.switchToWorkspace(buttonVert.workspaceValue);
                         }
-                        z: 10
                     }
+                    z: 10
+                }
+
+                Item {
+                    id: workspaceButtonBackgroundVert
+                    anchors.fill: parent
                     property var focusedWindow: {
                         const windowsInThisWorkspace = CompositorData.workspaceWindowsMap[buttonVert.workspaceValue] || [];
                         if (windowsInThisWorkspace.length === 0)
