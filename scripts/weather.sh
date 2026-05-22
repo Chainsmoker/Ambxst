@@ -31,7 +31,7 @@ http_get() {
 # Function to get coordinates from GeoIP
 get_geoip_coords() {
 	local response
-	response=$(http_get "https://ipapi.co/json/")
+	response=$(http_get "http://ip-api.com/json/")
 
 	if [[ -z "$response" ]]; then
 		echo '{"error": "GeoIP request failed"}'
@@ -39,8 +39,8 @@ get_geoip_coords() {
 	fi
 
 	local lat lon
-	lat=$(echo "$response" | jq -r '.latitude // empty')
-	lon=$(echo "$response" | jq -r '.longitude // empty')
+	lat=$(echo "$response" | jq -r '.lat // empty')
+	lon=$(echo "$response" | jq -r '.lon // empty')
 
 	if [[ -z "$lat" || -z "$lon" ]]; then
 		echo '{"error": "Could not determine location from GeoIP"}'
