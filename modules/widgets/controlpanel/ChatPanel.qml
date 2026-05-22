@@ -29,7 +29,9 @@ PanelWindow {
 
     readonly property bool isOpen: GlobalStates.chatPanelOpen
 
-    visible: isOpen || (panel.scale > 0.001)
+    // visible solo cuando isOpen o cuando la animación de SALIDA está corriendo
+    // (panel.opacity > 0). Sin esto la mask captura clicks de todo el sistema.
+    visible: isOpen || panel.opacity > 0.001
 
     // Reservar altura del bar y ancho del side notch
     readonly property int barReserved: {
@@ -89,8 +91,10 @@ PanelWindow {
         anchors.verticalCenter: parent.verticalCenter
         anchors.verticalCenterOffset: chatPanel.barReserved / 2
 
-        // Animación notch-style: scale + opacity desde un punto pequeño
-        scale: chatPanel.isOpen ? 1.0 : 0.6
+        // Animación notch-style: scale + opacity desde un punto pequeño.
+        // Cerrado: scale 0 para que NO se renderice mientras animation termina,
+        // y opacity 0 para que visible flag se apague (libera mask).
+        scale: chatPanel.isOpen ? 1.0 : 0.0
         opacity: chatPanel.isOpen ? 1.0 : 0.0
 
         transformOrigin: Item.Left   // sale "desde la izquierda" hacia la derecha
