@@ -53,12 +53,16 @@ QtObject {
 
         writer.text = css
         
+        // Hex del primary sin '#' para pasarle a apply-folder-color
+        const primaryHex = primary.replace(/^#/, "")
+
         // Write to GTK 3/4 and reload theme
         const cmd = `
             mkdir -p "${gtk3Dir}" "${gtk4Dir}" && \\
             echo "${css}" | tee "${gtk3Dir}/gtk.css" "${gtk4Dir}/gtk.css" > /dev/null && \\
             gsettings set org.gnome.desktop.interface gtk-theme "" && \\
-            gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3
+            gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3 && \\
+            { command -v apply-folder-color >/dev/null && apply-folder-color "${primaryHex}" || true; }
         `
         
         writerProcess.command = ["sh", "-c", cmd]
