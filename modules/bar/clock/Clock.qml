@@ -162,6 +162,14 @@ Item {
         bar: root.bar
         variant: "transparent"
         popupPadding: 0
+        visualMargin: 0
+
+        readonly property int fullHeight: Math.max(minContentHeight,
+            barAtTop ? bar.screen.height - 60 - shadowMargin * 2
+            : barAtBottom ? bar.screen.height - 60 - shadowMargin * 2
+            : 800)
+
+        readonly property int minContentHeight: 400
 
         contentWidth: unifiedWrapper.width
         contentHeight: unifiedWrapper.height
@@ -177,14 +185,18 @@ Item {
             id: unifiedWrapper
             variant: "popup"
             radius: Styling.radius(12)
+            topLeftRadius: 0
+            topRightRadius: 0
             enableShadow: true
-            width: popupColumn.width + 32
-            height: popupColumn.height + 24
+            width: 300 + 32
+            height: Math.max(popupColumn.height + 24, clockPopup.fullHeight)
 
             // Main popup column
             Column {
                 id: popupColumn
-                anchors.centerIn: parent
+                anchors.top: parent.top
+                anchors.topMargin: 12
+                anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 6
 
                 // Mini weekly calendar
