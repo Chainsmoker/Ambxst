@@ -6,6 +6,7 @@ import qs.config
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.services
+import qs.modules.globals
 import "../../widgets/dashboard/widgets"
 
 Item {
@@ -26,8 +27,8 @@ Item {
     property real startRadius: radius
     property real endRadius: radius
 
-    // Popup visibility state
-    property bool popupOpen: clockPopup.isOpen
+    // Popup visibility state — refleja el RightDock global
+    property bool popupOpen: GlobalStates.rightDockOpen
 
     readonly property bool weatherAvailable: WeatherService.dataAvailable
 
@@ -151,7 +152,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: false
             cursorShape: Qt.PointingHandCursor
-            onClicked: clockPopup.toggle()
+            onClicked: GlobalStates.rightDockOpen = !GlobalStates.rightDockOpen
         }
     }
 
@@ -638,7 +639,7 @@ Item {
                         id: pomodoroWidget
                         anchors.centerIn: parent
                         width: 300
-                        onRequestPopupOpen: clockPopup.open()
+                        onRequestPopupOpen: GlobalStates.rightDockOpen = true
                     }
                 }
 

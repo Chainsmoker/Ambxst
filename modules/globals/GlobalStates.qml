@@ -56,6 +56,8 @@ Singleton {
 
     // Side notch chat panel
     property bool chatPanelOpen: false
+    // Right edge dock (calendar + weather + pomodoro + color picker)
+    property bool rightDockOpen: false
     readonly property var availableLayouts: ["dwindle", "master", "scrolling"]
 
     Process {
