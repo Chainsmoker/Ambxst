@@ -60,18 +60,17 @@ PanelWindow {
 
     implicitWidth: dockWidth + 32
 
-    mask: Region {
-        item: panelMask
-    }
-
+    // Patrón ChatPanel: cuando cerrado → emptyMask explícito (no intercepta nada).
+    // Cuando abierto → fullMask con el área del dock.
+    mask: Region { item: dock.visible ? fullMask : emptyMask }
     Item {
-        id: panelMask
+        id: fullMask
         x: dock.width - dock.dockWidth
         y: 0
-        width: dock.isOpen ? dock.dockWidth : 0
-        height: dock.isOpen ? dock.height : 0
-        visible: false
+        width: dock.dockWidth
+        height: dock.height
     }
+    Item { id: emptyMask; width: 0; height: 0 }
 
     Item {
         id: dockContainer
