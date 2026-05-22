@@ -18,9 +18,9 @@ Item {
     required property var player
     required property bool notchHovered
 
-    // Mostrar el reproductor cuando hay player activo, sin esperar hover.
-    // Cuando no hay player, este flag refleja el hover normal (igual que antes).
-    readonly property bool playerExpanded: compactPlayer.player !== null || compactPlayer.notchHovered
+    // Mostrar el reproductor cuando HAY reproducción activa (no solo player existente).
+    // Si está pausado o sin player → vuelve al texto. Hover sigue funcionando.
+    readonly property bool playerExpanded: compactPlayer.isPlaying || compactPlayer.notchHovered
 
     onPlayerChanged: {
         if (!player) {
