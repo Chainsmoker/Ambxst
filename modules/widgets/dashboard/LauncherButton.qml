@@ -9,13 +9,15 @@ ToggleButton {
     iconTint: Config.bar.launcherIconTint
     iconFullTint: Config.bar.launcherIconFullTint
     iconSize: Config.bar.launcherIconSize
-    tooltipText: "Open Control Panel"
+    tooltipText: "Open Launcher"
 
     onToggle: function () {
-        if (Visibilities.currentActiveModule === "controlpanel") {
+        if (GlobalStates.launcherOpen) {
+            GlobalStates.clearLauncherState();
             Visibilities.setActiveModule("");
         } else {
-            Visibilities.setActiveModule("controlpanel");
+            GlobalStates.clearLauncherState();
+            Visibilities.setActiveModule("launcher");
         }
     }
 }

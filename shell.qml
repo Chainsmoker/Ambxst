@@ -165,7 +165,7 @@ ShellRoot {
         }
     }
 
-    // Control Panel — slide-in desde la izquierda
+    // SideNotch — auto-hide pill vertical en el borde izquierdo (igual al dock)
     Variants {
         model: {
             const screens = Quickshell.screens;
@@ -175,13 +175,9 @@ ShellRoot {
             return screens.filter(screen => list.indexOf(screen.name) !== -1);
         }
 
-        Loader {
-            id: controlPanelLoader
-            active: SuspendManager.wakeReady && (Visibilities.getForScreen(modelData.name) ? Visibilities.getForScreen(modelData.name).controlpanel : false)
+        ControlPanel {
             required property ShellScreen modelData
-            sourceComponent: ControlPanel {
-                screen: controlPanelLoader.modelData
-            }
+            screen: modelData
         }
     }
 
