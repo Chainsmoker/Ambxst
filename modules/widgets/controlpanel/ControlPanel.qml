@@ -12,9 +12,6 @@ import qs.config
 PanelWindow {
     id: controlPanel
 
-    required property ShellScreen modelData
-    screen: modelData
-
     anchors {
         top: true
         bottom: true
@@ -36,7 +33,7 @@ PanelWindow {
 
     // Tamaños
     readonly property int pillWidth: 56
-    readonly property int hoverRegionWidth: 4
+    readonly property int hoverRegionWidth: 8
     readonly property int sidePadding: 8
 
     // Hover state controla la reveal
