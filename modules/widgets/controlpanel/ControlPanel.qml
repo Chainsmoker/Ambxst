@@ -34,6 +34,20 @@ PanelWindow {
     // Ancho del panel (slide-in)
     property int panelWidth: 380
 
+    // Reservar el espacio del bar para no taparlo
+    readonly property int barReserved: {
+        const enabled = (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true);
+        if (!enabled) return 0;
+        const base = (Config.showBackground !== false) ? 44 : 40;
+        return Config.bar?.position === "top" ? base : 0;
+    }
+    readonly property int barReservedBottom: {
+        const enabled = (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true);
+        if (!enabled) return 0;
+        const base = (Config.showBackground !== false) ? 44 : 40;
+        return Config.bar?.position === "bottom" ? base : 0;
+    }
+
     mask: Region {
         item: controlPanelOpen ? fullMask : emptyMask
     }
@@ -83,7 +97,7 @@ PanelWindow {
         }
     }
 
-    // Panel deslizable desde la izquierda
+    // Panel deslizable desde la izquierda — pegado al borde, debajo del bar
     StyledRect {
         id: panel
         variant: "bg"
@@ -91,27 +105,29 @@ PanelWindow {
         anchors {
             top: parent.top
             bottom: parent.bottom
-            topMargin: 12
-            bottomMargin: 12
+            topMargin: controlPanel.barReserved
+            bottomMargin: controlPanel.barReservedBottom
         }
 
-        // Slide: cuando está cerrado, x = -width (fuera de pantalla a la izquierda)
-        //       cuando está abierto, x = 12 (12px de margen)
-        x: controlPanelOpen ? 12 : -width
+        // Slide: cuando está cerrado, x = -width; abierto, x = 0 (pegado al borde)
+        x: controlPanelOpen ? 0 : -width
 
+        // Solo redondeado en el lado derecho (estilo notch sticky)
+        topLeftRadius: 0
+        bottomLeftRadius: 0
         topRightRadius: Styling.radius(20)
         bottomRightRadius: Styling.radius(20)
-        topLeftRadius: Styling.radius(20)
-        bottomLeftRadius: Styling.radius(20)
 
         layer.enabled: true
         layer.effect: Shadow {}
 
+        // Animación notch-style: snappy con overshoot suave
         Behavior on x {
             enabled: Config.animDuration > 0
             NumberAnimation {
-                duration: Config.animDuration
-                easing.type: Easing.OutCubic
+                duration: Config.animDuration * 1.2
+                easing.type: Easing.OutBack
+                easing.overshoot: 0.6
             }
         }
 
