@@ -3,8 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import QtQuick.Shapes
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import qs.modules.globals
@@ -30,38 +28,32 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
 
     readonly property bool isOpen: GlobalStates.rightDockOpen
-    // CRÍTICO: PanelWindow oculto cuando cerrado + animación terminó.
-    // Sin esto, intercepta todos los clicks del sistema.
+    // CRÍTICO: PanelWindow se oculta cuando cerrado para no interceptar clicks.
     visible: isOpen || dockContainer.opacity > 0.001
 
-    // ── Geometría base ────────────────────────────────────────────
-    // Ancho total del dock (parte ancha, debajo del bar)
-    readonly property int dockWidth: 420
-    // Ancho de la "tira superior" — debe encajar con los iconos derechos del bar
+    // ── Geometría ─────────────────────────────────────────────────
+    readonly property int dockWidth: 360
+    readonly property int tabStripWidth: 56
     readonly property int topStripWidth: 240
-    // Radio del hombro: curva donde el dock pasa de angosto (arriba) a ancho (abajo)
-    readonly property int shoulderR: 24
-    // Radio del bottom-left para que el extremo inferior no quede cuadrado
+    readonly property int shoulderR: 22
     readonly property int bottomLeftR: Styling.radius(8)
 
-    readonly property int hPadding: 12
-    readonly property int vPadding: 0
-    readonly property int headerHeight: 150
-    readonly property int sectionSpacing: 10
+    readonly property int hPadding: 10
+    readonly property int headerHeight: 130
+    readonly property int sectionSpacing: 8
 
-    // Altura del bar superior — dónde termina visualmente
     readonly property int barHeight: {
         const enabled = (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true);
         if (!enabled) return 0;
         const base = (Config.showBackground !== false) ? 44 : 40;
         return Config.bar?.position === "top" ? base : 0;
     }
-    readonly property int barOuterMargin: 4
+
+    // Tab activa (0=calendar, 1=weather, 2=pomodoro, 3=picker)
+    property int activeTab: 0
 
     implicitWidth: dockWidth + 32
 
-    // Patrón ChatPanel: cuando cerrado → emptyMask explícito (no intercepta nada).
-    // Cuando abierto → fullMask con el área del dock.
     mask: Region { item: dock.visible ? fullMask : emptyMask }
     Item {
         id: fullMask
@@ -77,13 +69,13 @@ PanelWindow {
         width: dock.dockWidth
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: dock.barReserved
         anchors.bottom: parent.bottom
         opacity: dock.isOpen ? 1 : 0
         visible: opacity > 0.001
 
+        readonly property int shoulderInset: dock.dockWidth - dock.topStripWidth
+
         transform: Translate {
-            id: slideTransform
             x: dock.isOpen ? 0 : dock.dockWidth
             Behavior on x {
                 NumberAnimation {
@@ -100,268 +92,270 @@ PanelWindow {
             }
         }
 
-        // Fondo del dock dibujado como L-shape custom:
-        // - Tira angosta arriba (topStripWidth), alineada con los iconos del bar
-        // - Parte ancha abajo (dockWidth completo)
-        // - Curva tipo fillet en el "hombro" donde se ensancha
-        // - Bottom-left redondeado
-        Shape {
-            id: dockShape
-            anchors.fill: parent
+        // ── FONDO ── tres piezas que arman la L:
+        // 1) Tira angosta arriba (a la derecha)
+        // 2) Parte ancha abajo (full width + bottom-left rounded)
+        // 3) Pieza curva en el hombro (fillet)
+
+        // 1) Tira angosta — desde y=0 hasta y=barHeight, sólo a la derecha
+        Rectangle {
+            id: topStripBg
+            x: dockContainer.shoulderInset
+            y: 0
+            width: dock.topStripWidth
+            height: dock.barHeight
+            color: Colors.surfaceDim
+        }
+
+        // 2) Parte ancha — desde y=barHeight hasta abajo, ancho completo
+        Rectangle {
+            id: bottomBg
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.top: parent.top
+            anchors.topMargin: dock.barHeight
+            color: Colors.surfaceDim
+            bottomLeftRadius: dock.bottomLeftR
+            topLeftRadius: 0
+            topRightRadius: 0
+            bottomRightRadius: 0
+        }
+
+        // 3) Hombro fillet — Canvas que rellena la curva en la esquina interna
+        Canvas {
+            id: shoulderFiller
+            x: dockContainer.shoulderInset - dock.shoulderR
+            y: dock.barHeight
+            width: dock.shoulderR
+            height: dock.shoulderR
             antialiasing: true
-            // Sin MultiEffect por ahora (rompe el render del Shape).
-            // Sombra: pendiente de re-agregar con DropShadow externo.
 
-            readonly property real shoulderInset: dock.dockWidth - dock.topStripWidth
+            Component.onCompleted: requestPaint()
+            Connections {
+                target: Colors
+                function onSurfaceDimChanged() { shoulderFiller.requestPaint(); }
+            }
 
-            ShapePath {
-                strokeColor: "transparent"
-                strokeWidth: 0
-                fillColor: Colors.surfaceDim
-                joinStyle: ShapePath.RoundJoin
-                capStyle: ShapePath.RoundCap
-
-                startX: dock.dockWidth
-                startY: 0
-
-                // Top edge derecha-a-izquierda del top strip
-                PathLine { x: dockShape.shoulderInset; y: 0 }
-
-                // Lado izquierdo del top strip bajando hasta el inicio del hombro
-                PathLine {
-                    x: dockShape.shoulderInset
-                    y: dock.barHeight - dock.shoulderR
-                }
-
-                // ── HOMBRO FILLET ── curva que ensancha el dock
-                // Va de (shoulderInset, barHeight - shoulderR) a (shoulderInset - shoulderR, barHeight)
-                // bulging hacia top-left (afuera del dock interior) → fillet convexo
-                PathArc {
-                    x: dockShape.shoulderInset - dock.shoulderR
-                    y: dock.barHeight
-                    radiusX: dock.shoulderR
-                    radiusY: dock.shoulderR
-                    direction: PathArc.Counterclockwise
-                }
-
-                // Top edge de la parte ancha desde el hombro hasta el borde izquierdo
-                PathLine { x: 0; y: dock.barHeight }
-
-                // Lado izquierdo bajando al bottom-left corner
-                PathLine { x: 0; y: dockShape.height - dock.bottomLeftR }
-
-                // ── BOTTOM-LEFT CORNER ──
-                PathArc {
-                    x: dock.bottomLeftR
-                    y: dockShape.height
-                    radiusX: dock.bottomLeftR
-                    radiusY: dock.bottomLeftR
-                    direction: PathArc.Counterclockwise
-                }
-
-                // Bottom edge
-                PathLine { x: dock.dockWidth; y: dockShape.height }
-
-                // Cierra implícitamente subiendo por el lado derecho hasta (dockWidth, 0)
+            onPaint: {
+                var ctx = getContext("2d");
+                var r = width;
+                ctx.clearRect(0, 0, width, height);
+                // Rellenamos la esquina BOTTOM-RIGHT del cuadrante con un arco
+                // que excluye el cuarto-de-disco TOP-LEFT (creando un fillet cóncavo
+                // visto desde afuera, suavizando la inside corner de la L).
+                // Path:
+                //   start (r, 0)        top-right
+                //   arc ↻ to (0, r)     curve bulges hacia (r, r) [inside dock]
+                //   line to (r, r)      bottom-right (cierra via right edge)
+                ctx.beginPath();
+                ctx.moveTo(r, 0);
+                // Arc centered at (r, r) with radius r, from angle 3π/2 (up) to π (left),
+                // anticlockwise → traza el cuarto curvado por el lado del exterior.
+                ctx.arc(r, r, r, 3 * Math.PI / 2, Math.PI, true);
+                ctx.lineTo(r, r);
+                ctx.closePath();
+                ctx.fillStyle = Colors.surfaceDim;
+                ctx.fill();
             }
         }
 
-        ScrollView {
-            id: scroller
-            anchors.fill: parent
-            anchors.topMargin: dock.barHeight
-            clip: true
-            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+        // ── TAB STRIP ── columna vertical de iconos a la izquierda ───
+        Column {
+            id: tabStrip
+            x: 0
+            y: dock.barHeight + dock.shoulderR + 8
+            width: dock.tabStripWidth
+            spacing: 4
 
-            ColumnLayout {
-                width: scroller.width
-                spacing: dock.sectionSpacing
+            Repeater {
+                model: [
+                    { ico: "", name: "Calendario" },   // calendar_today
+                    { ico: "", name: "Clima" },        // cloud
+                    { ico: "", name: "Trabajo" },      // timer
+                    { ico: "", name: "Colores" }       // palette
+                ]
 
-                // ── HEADER (full-bleed) ─────────────────────────
-                DistroHeader {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: dock.headerHeight
-                    Layout.topMargin: 0
+                Item {
+                    id: tabItem
+                    required property var modelData
+                    required property int index
+                    width: dock.tabStripWidth
+                    height: 48
+
+                    readonly property bool active: dock.activeTab === tabItem.index
+
+                    Rectangle {
+                        id: tabPill
+                        anchors.centerIn: parent
+                        width: tabItem.active ? 44 : 40
+                        height: 40
+                        radius: 14
+                        color: tabItem.active
+                               ? Styling.srItem("primary")
+                               : (tabMa.containsMouse ? Styling.srItem("focus") : "transparent")
+
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: tabItem.modelData.ico
+                        font.family: "MaterialSymbolsRounded"
+                        font.pixelSize: 22
+                        color: tabItem.active ? Colors.background : Colors.overBackground
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                    }
+
+                    MouseArea {
+                        id: tabMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: dock.activeTab = tabItem.index
+                    }
+
+                    StyledToolTip {
+                        visible: tabMa.containsMouse
+                        tooltipText: tabItem.modelData.name
+                    }
                 }
+            }
+        }
 
-                // ── CALENDAR (full month) ──────────────────────
+        // ── ÁREA DE CONTENIDO ── header + tab activa ───────────────
+        Item {
+            id: contentArea
+            x: dock.tabStripWidth
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: dock.barHeight + dock.shoulderR
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 12
+
+            // Header en la parte de arriba del área de contenido
+            DistroHeader {
+                id: header
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: dock.headerHeight
+            }
+
+            // StackLayout con la tab activa
+            StackLayout {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: header.bottom
+                anchors.topMargin: dock.sectionSpacing
+                anchors.bottom: parent.bottom
+                currentIndex: dock.activeTab
+
+                // Tab 0: Calendar
                 StyledRect {
                     id: calendarPane
-                    Layout.fillWidth: true
-                    Layout.leftMargin: dock.hPadding
-                    Layout.rightMargin: dock.hPadding
                     variant: "pane"
                     radius: Styling.radius(6)
                     enableShadow: false
-                    Layout.preferredHeight: calendarColumn.implicitHeight + 24
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
 
                     property date currentDate: new Date()
                     property date viewDate: new Date()
 
                     Timer {
                         interval: 60000
-                        running: dock.isOpen
+                        running: dock.isOpen && dock.activeTab === 0
                         repeat: true
                         onTriggered: calendarPane.currentDate = new Date()
                     }
 
-                    function isSameDay(a, b) {
-                        return a.getFullYear() === b.getFullYear()
-                            && a.getMonth() === b.getMonth()
-                            && a.getDate() === b.getDate();
-                    }
-
                     Column {
-                        id: calendarColumn
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        anchors.topMargin: 12
+                        id: calendarCol
+                        anchors.fill: parent
+                        anchors.margins: 10
                         spacing: 8
 
-                        // Month header con nav
                         Item {
                             width: parent.width
-                            height: 28
-
-                            Row {
+                            height: 24
+                            Text {
+                                anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 6
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: {
-                                        var m = calendarPane.viewDate.toLocaleDateString(Qt.locale(), "MMMM yyyy");
-                                        return m.charAt(0).toUpperCase() + m.slice(1);
-                                    }
-                                    color: Colors.overBackground
-                                    font.family: Config.theme.font
-                                    font.pixelSize: Styling.fontSize(1)
-                                    font.weight: Font.Medium
+                                text: {
+                                    var m = calendarPane.viewDate.toLocaleDateString(Qt.locale(), "MMMM yyyy");
+                                    return m.charAt(0).toUpperCase() + m.slice(1);
                                 }
-                            }
-
-                            Row {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Repeater {
-                                    model: [
-                                        { ico: "", delta: -1 },
-                                        { ico: "", delta:  0 },
-                                        { ico: "", delta:  1 }
-                                    ]
-                                    Item {
-                                        id: navBtn
-                                        required property var modelData
-                                        width: 26
-                                        height: 26
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            radius: 13
-                                            color: navMa.containsMouse ? Styling.srItem("focus") : "transparent"
-                                            Behavior on color { ColorAnimation { duration: 100 } }
-                                        }
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: navBtn.modelData.ico
-                                            font.family: "MaterialSymbolsRounded"
-                                            font.pixelSize: 16
-                                            color: Colors.overBackground
-                                        }
-                                        MouseArea {
-                                            id: navMa
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (navBtn.modelData.delta === 0) {
-                                                    calendarPane.viewDate = new Date();
-                                                } else {
-                                                    var d = new Date(calendarPane.viewDate);
-                                                    d.setMonth(d.getMonth() + navBtn.modelData.delta);
-                                                    calendarPane.viewDate = d;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                color: Colors.overBackground
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(0)
+                                font.weight: Font.Medium
                             }
                         }
 
-                        // Día headers
                         Row {
-                            id: weekHeaderRow
+                            id: weekRow
                             spacing: 2
-                            property real cellW: (calendarColumn.width - 6 * spacing) / 7
-
+                            property real cellW: (calendarCol.width - 6 * spacing) / 7
                             Repeater {
                                 model: ["L", "M", "M", "J", "V", "S", "D"]
                                 Item {
                                     required property var modelData
-                                    required property int index
-                                    width: weekHeaderRow.cellW
-                                    height: 18
+                                    width: weekRow.cellW
+                                    height: 16
                                     Text {
                                         anchors.centerIn: parent
                                         text: parent.modelData
                                         color: Colors.outline
                                         font.family: Config.theme.font
                                         font.pixelSize: Styling.fontSize(-1)
-                                        font.weight: Font.Medium
                                     }
                                 }
                             }
                         }
 
-                        // Grid del mes (42 celdas)
                         Grid {
                             id: monthGrid
                             columns: 7
                             spacing: 2
-                            property real cellW: (calendarColumn.width - 6 * spacing) / 7
+                            property real cellW: (calendarCol.width - 6 * spacing) / 7
 
-                            property var monthCells: {
+                            property var cells: {
                                 var view = calendarPane.viewDate;
                                 var first = new Date(view.getFullYear(), view.getMonth(), 1);
-                                var startWeekday = (first.getDay() + 6) % 7;  // Mon = 0
+                                var startWeekday = (first.getDay() + 6) % 7;
                                 var start = new Date(first);
                                 start.setDate(first.getDate() - startWeekday);
-                                var cells = [];
+                                var arr = [];
                                 for (var i = 0; i < 42; i++) {
                                     var d = new Date(start);
                                     d.setDate(start.getDate() + i);
-                                    cells.push({
-                                        date: d,
+                                    arr.push({
                                         day: d.getDate(),
                                         inMonth: d.getMonth() === view.getMonth(),
-                                        isToday: calendarPane.isSameDay(d, calendarPane.currentDate)
+                                        isToday: d.getFullYear() === calendarPane.currentDate.getFullYear()
+                                            && d.getMonth() === calendarPane.currentDate.getMonth()
+                                            && d.getDate() === calendarPane.currentDate.getDate()
                                     });
                                 }
-                                return cells;
+                                return arr;
                             }
 
                             Repeater {
-                                model: monthGrid.monthCells
-
+                                model: monthGrid.cells
                                 Item {
                                     required property var modelData
                                     width: monthGrid.cellW
                                     height: monthGrid.cellW
-
                                     Rectangle {
                                         anchors.fill: parent
                                         anchors.margins: 2
                                         radius: width / 2
                                         color: parent.modelData.isToday
                                                ? Styling.srItem("overprimary")
-                                               : (cellHover.containsMouse ? Styling.srItem("focus") : "transparent")
-                                        Behavior on color { ColorAnimation { duration: 100 } }
+                                               : "transparent"
                                     }
-
                                     Text {
                                         anchors.centerIn: parent
                                         text: parent.modelData.day
@@ -373,101 +367,82 @@ PanelWindow {
                                         font.pixelSize: Styling.fontSize(0)
                                         font.weight: parent.modelData.isToday ? Font.Bold : Font.Normal
                                     }
-
-                                    MouseArea {
-                                        id: cellHover
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // ── WEATHER ─────────────────────────────────────
+                // Tab 1: Weather
                 StyledRect {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: dock.hPadding
-                    Layout.rightMargin: dock.hPadding
                     variant: "pane"
                     radius: Styling.radius(6)
                     enableShadow: false
-                    visible: WeatherService.dataAvailable
-                    Layout.preferredHeight: visible ? (weatherCol.implicitHeight + 12) : 0
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
 
-                    Column {
-                        id: weatherCol
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.margins: 6
-                        spacing: 4
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: 8
 
                         WeatherWidget {
-                            width: parent.width
-                            height: 130
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 140
                             showDebugControls: false
-                            animationsEnabled: dock.isOpen
+                            animationsEnabled: dock.isOpen && dock.activeTab === 1
                         }
-                    }
-                }
-
-                // ── POMODORO / START WORK ───────────────────────
-                StyledRect {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: dock.hPadding
-                    Layout.rightMargin: dock.hPadding
-                    variant: "pane"
-                    radius: Styling.radius(6)
-                    enableShadow: false
-                    Layout.preferredHeight: pomo.implicitHeight + 12
-
-                    Pomodoro {
-                        id: pomo
-                        anchors.centerIn: parent
-                        width: parent.width - 12
-                    }
-                }
-
-                // ── COLOR PICKER ────────────────────────────────
-                StyledRect {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: dock.hPadding
-                    Layout.rightMargin: dock.hPadding
-                    variant: "pane"
-                    radius: Styling.radius(6)
-                    enableShadow: false
-                    Layout.preferredHeight: pickerCol.implicitHeight + 20
-
-                    Column {
-                        id: pickerCol
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-                        anchors.topMargin: 10
-                        spacing: 6
 
                         Text {
-                            text: "Color picker"
+                            anchors.centerIn: parent
+                            visible: !WeatherService.dataAvailable
+                            text: "Cargando clima..."
                             color: Colors.outline
                             font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Medium
+                            font.pixelSize: Styling.fontSize(0)
                         }
+                    }
+                }
+
+                // Tab 2: Pomodoro / Trabajo
+                StyledRect {
+                    variant: "pane"
+                    radius: Styling.radius(6)
+                    enableShadow: false
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    Item {
+                        anchors.fill: parent
+                        anchors.margins: 8
+
+                        Pomodoro {
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                        }
+                    }
+                }
+
+                // Tab 3: Color picker
+                StyledRect {
+                    variant: "pane"
+                    radius: Styling.radius(6)
+                    enableShadow: false
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ScrollView {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                         ColorPicker {
                             width: parent.width
                         }
                     }
-                }
-
-                Item {
-                    Layout.preferredHeight: 12
-                    Layout.fillWidth: true
                 }
             }
         }
