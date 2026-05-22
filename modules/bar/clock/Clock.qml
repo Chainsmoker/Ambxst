@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs.config
 import qs.modules.theme
 import qs.modules.components
@@ -162,8 +163,8 @@ Item {
         variant: "transparent"
         popupPadding: 0
 
-        contentWidth: popupColumn.width
-        contentHeight: popupColumn.height
+        contentWidth: unifiedWrapper.width
+        contentHeight: unifiedWrapper.height
 
         onIsOpenChanged: {
             if (isOpen && !WeatherService.dataAvailable) {
@@ -171,18 +172,28 @@ Item {
             }
         }
 
-        // Main popup column
-        Column {
-            id: popupColumn
-            spacing: 4
+        // Unified background wrapping all sections
+        StyledRect {
+            id: unifiedWrapper
+            variant: "popup"
+            radius: Styling.radius(12)
+            enableShadow: true
+            width: popupColumn.width + 32
+            height: popupColumn.height + 24
 
-            // Mini weekly calendar
-            StyledRect {
-                id: calendarWrapper
-                variant: "popup"
-                radius: Styling.radius(8)
-                enableShadow: false
-                width: 300 + 16 // Match popupWrapper width
+            // Main popup column
+            Column {
+                id: popupColumn
+                anchors.centerIn: parent
+                spacing: 6
+
+                // Mini weekly calendar
+                StyledRect {
+                    id: calendarWrapper
+                    variant: "pane"
+                    radius: Styling.radius(6)
+                    enableShadow: false
+                    width: 300 + 16
                 height: calendarContent.height + 32
 
                 property date currentDate: new Date()
@@ -314,15 +325,15 @@ Item {
                 }
             }
 
-            // Weather Wrapper StyledRect
-            StyledRect {
-                id: popupWrapper
-                variant: "popup"
-                radius: Styling.radius(8)
-                enableShadow: false
-                width: popupContent.width + 16
-                height: popupContent.height + 16
-                visible: WeatherService.dataAvailable
+                // Weather Wrapper StyledRect
+                StyledRect {
+                    id: popupWrapper
+                    variant: "pane"
+                    radius: Styling.radius(6)
+                    enableShadow: false
+                    width: popupContent.width + 16
+                    height: popupContent.height + 16
+                    visible: WeatherService.dataAvailable
 
                 // Content container
                 Column {
@@ -602,20 +613,85 @@ Item {
                 }
             }
 
-            // Pomodoro Wrapper StyledRect
-            StyledRect {
-                id: pomodoroWrapper
-                variant: "popup"
-                radius: Styling.radius(8)
-                enableShadow: false
-                width: 300 + 16 // Match weather popup width
-                height: pomodoroWidget.height + 16
+                // Pomodoro Wrapper StyledRect
+                StyledRect {
+                    id: pomodoroWrapper
+                    variant: "pane"
+                    radius: Styling.radius(6)
+                    enableShadow: false
+                    width: 300 + 16
+                    height: pomodoroWidget.height + 16
 
-                Pomodoro {
-                    id: pomodoroWidget
-                    anchors.centerIn: parent
-                    width: 300
-                    onRequestPopupOpen: clockPopup.open()
+                    Pomodoro {
+                        id: pomodoroWidget
+                        anchors.centerIn: parent
+                        width: 300
+                        onRequestPopupOpen: clockPopup.open()
+                    }
+                }
+
+                // Theme color palette
+                StyledRect {
+                    id: colorPaletteWrapper
+                    variant: "pane"
+                    radius: Styling.radius(6)
+                    enableShadow: false
+                    width: 300 + 16
+                    height: paletteContent.height + 16
+
+                    Column {
+                        id: paletteContent
+                        anchors.centerIn: parent
+                        spacing: 8
+                        width: 300
+
+                        Text {
+                            text: "Palette"
+                            color: Colors.outline
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.weight: Font.Medium
+                        }
+
+                        Row {
+                            spacing: 6
+                            anchors.horizontalCenter: parent.horizontalCenter
+
+                            Repeater {
+                                model: [
+                                    { name: "primary", hex: Colors.primary },
+                                    { name: "secondary", hex: Colors.secondary },
+                                    { name: "tertiary", hex: Colors.tertiary },
+                                    { name: "error", hex: Colors.error },
+                                    { name: "surface", hex: Colors.surface },
+                                    { name: "srfVrnt", hex: Colors.surfaceVariant },
+                                    { name: "outline", hex: Colors.outline },
+                                    { name: "shadow", hex: Colors.shadow }
+                                ]
+
+                                delegate: Rectangle {
+                                    id: swatch
+                                    readonly property string colorHex: modelData.hex
+                                    readonly property string colorName: modelData.name
+                                    width: 32
+                                    height: 32
+                                    radius: Styling.radius(3)
+                                    color: colorHex
+                                    border.color: Colors.outline
+                                    border.width: 1
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            Quickshell.execDetached(["wl-copy", swatch.colorHex]);
+                                            Quickshell.execDetached(["notify-send", "Copied", swatch.colorName + " \u2014 " + swatch.colorHex]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
