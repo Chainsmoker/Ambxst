@@ -3,6 +3,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Shapes
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import qs.modules.globals
@@ -28,24 +30,30 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
 
     readonly property bool isOpen: GlobalStates.rightDockOpen
-    readonly property int dockWidth: 380
+
+    // ── Geometría base ────────────────────────────────────────────
+    // Ancho total del dock (parte ancha, debajo del bar)
+    readonly property int dockWidth: 480
+    // Ancho de la "tira superior" — debe encajar con los iconos derechos del bar
+    readonly property int topStripWidth: 280
+    // Radio del hombro: curva donde el dock pasa de angosto (arriba) a ancho (abajo)
+    readonly property int shoulderR: 28
+    // Radio del bottom-left para que el extremo inferior no quede cuadrado
+    readonly property int bottomLeftR: Styling.radius(8)
+
     readonly property int hPadding: 12
-    readonly property int vPadding: 0          // header come hasta el borde
+    readonly property int vPadding: 0
     readonly property int headerHeight: 150
     readonly property int sectionSpacing: 10
 
-    // Altura del bar superior (para overlap visual con la barra)
+    // Altura del bar superior — dónde termina visualmente
     readonly property int barHeight: {
         const enabled = (Config.bar && Config.bar.pinnedOnStartup !== undefined ? Config.bar.pinnedOnStartup : true);
         if (!enabled) return 0;
         const base = (Config.showBackground !== false) ? 44 : 40;
         return Config.bar?.position === "top" ? base : 0;
     }
-    // Margen externo del bar (gap del bar al borde de pantalla)
     readonly property int barOuterMargin: 4
-    readonly property int notchCurveSize: Math.max(Styling.radius(8), 12)
-    // El dock arranca desde arriba — el bar (layer Overlay) flota encima
-    readonly property int barReserved: 0
 
     implicitWidth: dockWidth + 32
 
@@ -55,10 +63,9 @@ PanelWindow {
 
     Item {
         id: panelMask
-        // Incluir el curve-notch a la izquierda del dock
-        x: dock.width - dock.dockWidth - dock.notchCurveSize
+        x: dock.width - dock.dockWidth
         y: 0
-        width: dock.isOpen ? (dock.dockWidth + dock.notchCurveSize) : 0
+        width: dock.isOpen ? dock.dockWidth : 0
         height: dock.isOpen ? dock.height : 0
         visible: false
     }
@@ -91,58 +98,77 @@ PanelWindow {
             }
         }
 
-        // Fondo único: arranca desde y=0 para fundirse con el bar superior.
-        // Usa "barbg" para matchear EXACTAMENTE el color del bar (surfaceDim vs background).
-        StyledRect {
-            id: dockBg
+        // Fondo del dock dibujado como L-shape custom:
+        // - Tira angosta arriba (topStripWidth), alineada con los iconos del bar
+        // - Parte ancha abajo (dockWidth completo)
+        // - Curva tipo fillet en el "hombro" donde se ensancha
+        // - Bottom-left redondeado
+        Shape {
+            id: dockShape
             anchors.fill: parent
-            variant: "barbg"
-            enableShadow: true
-            radius: 0
-            topLeftRadius: 0
-            bottomLeftRadius: Styling.radius(8)
-            topRightRadius: 0
-            bottomRightRadius: 0
-            clip: true
-        }
-
-        // ── Curva tipo dashboard donde el bar se conecta al dock ──
-        // A la izquierda del dock, justo bajo el bar: extiende el fondo del dock
-        // hacia la izquierda con un arco cóncavo, simulando un notch que sale del bar.
-        Item {
-            id: notchCurveLeft
-            width: dock.notchCurveSize
-            height: dock.notchCurveSize
-            x: -dock.notchCurveSize
-            y: dock.barHeight - dock.barOuterMargin
-            visible: dock.barHeight > 0
-
-            Canvas {
-                id: notchCanvas
-                anchors.fill: parent
-                antialiasing: true
-
-                function paintCorner() { requestPaint(); }
-                Component.onCompleted: requestPaint()
-
-                onPaint: {
-                    var ctx = getContext("2d");
-                    var w = width;
-                    ctx.clearRect(0, 0, w, height);
-                    // L sólida en bottom-right; arco cóncavo desde top-right → bottom-left
-                    // centrado en (0,0): "muerde" el cuadrante top-left
-                    ctx.beginPath();
-                    ctx.moveTo(w, w);
-                    ctx.lineTo(w, 0);
-                    ctx.arc(0, 0, w, 0, Math.PI / 2, false);
-                    ctx.closePath();
-                    ctx.fillStyle = Colors.surfaceDim;
-                    ctx.fill();
-                }
+            antialiasing: true
+            layer.enabled: true
+            layer.samples: 8
+            layer.effect: MultiEffect {
+                shadowEnabled: true
+                shadowBlur: 1.0
+                shadowVerticalOffset: 2
+                shadowHorizontalOffset: -2
+                shadowColor: Qt.rgba(0, 0, 0, 0.45)
+                shadowOpacity: 0.7
             }
-            Connections {
-                target: Colors
-                function onSurfaceDimChanged() { notchCanvas.requestPaint(); }
+
+            readonly property real shoulderInset: dock.dockWidth - dock.topStripWidth
+
+            ShapePath {
+                strokeColor: "transparent"
+                strokeWidth: 0
+                fillColor: Colors.surfaceDim
+                joinStyle: ShapePath.RoundJoin
+                capStyle: ShapePath.RoundCap
+
+                startX: dock.dockWidth
+                startY: 0
+
+                // Top edge derecha-a-izquierda del top strip
+                PathLine { x: dockShape.shoulderInset; y: 0 }
+
+                // Lado izquierdo del top strip bajando hasta el inicio del hombro
+                PathLine {
+                    x: dockShape.shoulderInset
+                    y: dock.barHeight - dock.shoulderR
+                }
+
+                // ── HOMBRO FILLET ── curva que ensancha el dock
+                // Va de (shoulderInset, barHeight - shoulderR) a (shoulderInset - shoulderR, barHeight)
+                // bulging hacia top-left (afuera del dock interior) → fillet convexo
+                PathArc {
+                    x: dockShape.shoulderInset - dock.shoulderR
+                    y: dock.barHeight
+                    radiusX: dock.shoulderR
+                    radiusY: dock.shoulderR
+                    direction: PathArc.Counterclockwise
+                }
+
+                // Top edge de la parte ancha desde el hombro hasta el borde izquierdo
+                PathLine { x: 0; y: dock.barHeight }
+
+                // Lado izquierdo bajando al bottom-left corner
+                PathLine { x: 0; y: dockShape.height - dock.bottomLeftR }
+
+                // ── BOTTOM-LEFT CORNER ──
+                PathArc {
+                    x: dock.bottomLeftR
+                    y: dockShape.height
+                    radiusX: dock.bottomLeftR
+                    radiusY: dock.bottomLeftR
+                    direction: PathArc.Counterclockwise
+                }
+
+                // Bottom edge
+                PathLine { x: dock.dockWidth; y: dockShape.height }
+
+                // Cierra implícitamente subiendo por el lado derecho hasta (dockWidth, 0)
             }
         }
 
