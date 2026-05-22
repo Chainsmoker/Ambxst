@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Wayland
 import qs.modules.globals
@@ -262,14 +263,17 @@ Item {
                 }
             }
 
-            // Double-click on empty space to switch workspace
+            // Single-click on empty space → cambia al workspace (incluso si está vacío)
             TapHandler {
                 acceptedButtons: Qt.LeftButton
-                onDoubleTapped: {
-                    AxctlService.dispatch(`workspace ${root.workspaceId}`);
+                onTapped: {
+                    switchProc.command = ["hyprctl", "dispatch", "workspace", String(root.workspaceId)];
+                    switchProc.running = false;
+                    switchProc.running = true;
                     Visibilities.setActiveModule("", true);
                 }
             }
+            Process { id: switchProc }
 
             Repeater {
                 model: root.workspaceWindows

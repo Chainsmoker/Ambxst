@@ -213,8 +213,14 @@ Item {
     readonly property int activeWorkspaceId: monitor?.activeWorkspace?.id || 1
     readonly property real workspaceRowHeight: workspaceHeight + workspaceSpacing
 
-    // Scroll to center active workspace when it changes
-    onActiveWorkspaceIdChanged: workspaceFlickable.scrollToActiveWorkspace()
+    // Scroll to center active workspace cuando ACTUALMENTE cambia (no en re-evaluaciones)
+    property int _lastScrolledWs: -1
+    onActiveWorkspaceIdChanged: {
+        if (activeWorkspaceId !== _lastScrolledWs) {
+            _lastScrolledWs = activeWorkspaceId;
+            workspaceFlickable.scrollToActiveWorkspace();
+        }
+    }
 
     // Vertical flickable containing all workspaces
     Flickable {
