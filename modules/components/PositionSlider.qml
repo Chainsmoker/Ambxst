@@ -41,9 +41,10 @@ Item {
         backgroundColor: root.useCustomColors ? root.customBackgroundColor : Colors.shadow
         wavy: true // Always use CarouselProgress logic
         playing: root.isPlaying // Control animation state via playing property
-        wavyAmplitude: root.isPlaying ? 1 : 0.0
+        wavyAmplitude: root.isPlaying ? 1.4 : 0.0
         wavyFrequency: root.isPlaying ? 8 : 0
         heightMultiplier: root.player ? 8 : 4
+        thickness: 8                       // antes 4 (default de StyledSlider)
         smoothDrag: true
         scroll: false
         tooltip: false
