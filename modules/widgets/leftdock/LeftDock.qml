@@ -35,7 +35,7 @@ PanelWindow {
     readonly property int dockWidth: 420
     readonly property int hPadding: 16
     readonly property int sectionSpacing: 12
-    readonly property int headerHeight: 160
+    readonly property int headerHeight: 120
     readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
 
     // Tab activa: 0=Tech News, 1=CVEs, 2=Reddit
@@ -44,6 +44,11 @@ PanelWindow {
     onCurrentTabChanged: {
         if (scroller.contentItem) {
             scroller.contentItem.contentY = 0
+            Qt.callLater(() => {
+                if (scroller.contentItem) {
+                    scroller.contentItem.contentY = 0
+                }
+            })
         }
     }
 
@@ -429,23 +434,32 @@ PanelWindow {
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: (event) => {
                     var flick = scroller.contentItem;
-                    var scrollStep = event.angleDelta.y * 1.8;
+                    var scrollStep = event.angleDelta.y * 3.5;
                     flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY - scrollStep));
                     event.accepted = true;
                 }
             }
 
-            StackLayout {
+            Item {
                 id: contentStack
                 x: 12
                 width: scroller.width - 24
-                implicitHeight: (contentStack.currentIndex >= 0 && contentStack.children[contentStack.currentIndex]) ? contentStack.children[contentStack.currentIndex].implicitHeight : 0
-                currentIndex: dock.currentTab
+                height: implicitHeight
+                implicitHeight: {
+                    switch (dock.currentTab) {
+                        case 0: return techColumn.implicitHeight;
+                        case 1: return cveColumn.implicitHeight;
+                        case 2: return redditColumn.implicitHeight;
+                        default: return 0;
+                    }
+                }
 
                     // Tab 0: Tech News
                     ColumnLayout {
+                        id: techColumn
                         Layout.fillWidth: true
                         spacing: 12
+                        visible: dock.currentTab === 0
 
                         Loader {
                             Layout.fillWidth: true
@@ -466,8 +480,10 @@ PanelWindow {
 
                     // Tab 1: Latest CVEs
                     ColumnLayout {
+                        id: cveColumn
                         Layout.fillWidth: true
                         spacing: 12
+                        visible: dock.currentTab === 1
 
                         Loader {
                             Layout.fillWidth: true
@@ -614,8 +630,10 @@ PanelWindow {
 
                     // Tab 2: Reddit Updates
                     ColumnLayout {
+                        id: redditColumn
                         Layout.fillWidth: true
                         spacing: 12
+                        visible: dock.currentTab === 2
 
                         Loader {
                             Layout.fillWidth: true
