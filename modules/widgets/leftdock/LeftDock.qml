@@ -68,8 +68,8 @@ PanelWindow {
     mask: Region {
         regions: [
             Region { item: dock.isOpen ? fullMask : hoverStrip },
-            Region { item: (dock.isOpen && dock.barAtTop) ? topRightShoulder : null },
-            Region { item: (dock.isOpen && !dock.barAtTop) ? bottomRightShoulder : null }
+            Region { item: (dock.isOpen && dock.barAtTop && Config.showBackground) ? topRightShoulder : null },
+            Region { item: (dock.isOpen && !dock.barAtTop && Config.showBackground) ? bottomRightShoulder : null }
         ]
     }
     Item {
@@ -317,7 +317,7 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.top: dockBg.top
             anchors.left: dockBg.right
-            visible: dock.barAtTop
+            visible: dock.barAtTop && Config.showBackground
 
             RoundCorner {
                 anchors.fill: parent
@@ -335,7 +335,7 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.bottom: dockBg.bottom
             anchors.left: dockBg.right
-            visible: !dock.barAtTop
+            visible: !dock.barAtTop && Config.showBackground
 
             RoundCorner {
                 anchors.fill: parent

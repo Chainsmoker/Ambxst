@@ -254,7 +254,7 @@ Item {
             // Bar paint cubre el ancho del dock body. El tab rail vertical
             // fue eliminado, así que volvemos a 380px puro.
             readonly property int dockWidth: 420
-            readonly property int shoulderSize: 18  // debe coincidir con RightDock.qml:shoulderSize
+            readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 20 : 36  // debe coincidir con RightDock.qml:shoulderSize
             visible: opacity > 0.001
             opacity: (root.orientation === "horizontal" && GlobalStates.rightDockOpen) ? 1 : 0
             anchors.right: parent.right
@@ -276,6 +276,25 @@ Item {
             }
         }
 
+        // Hombro cóncavo en el top-left de la franja del bar: extiende el bg hacia la izquierda
+        // con una curva tipo notch, simétrica con el hombro inferior del dock.
+        Item {
+            id: topLeftShoulder
+            width: rightDockAccent.shoulderSize
+            height: rightDockAccent.shoulderSize
+            anchors.top: rightDockAccent.top
+            anchors.right: rightDockAccent.left
+            visible: rightDockAccent.visible && !Config.showBackground
+            opacity: rightDockAccent.opacity
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: RoundCorner.CornerEnum.BottomRight
+                size: rightDockAccent.shoulderSize
+                color: rightDockAccent.color
+            }
+        }
+
 
         // Pinta el lado izquierdo del bar con el color "bg" cuando el LeftDock está abierto,
         // para que bar y dock se vean como una sola superficie continua.
@@ -283,7 +302,7 @@ Item {
         StyledRect {
             id: leftDockAccent
             readonly property int dockWidth: 420
-            readonly property int shoulderSize: 18
+            readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 20 : 36
             visible: opacity > 0.001
             opacity: (root.orientation === "horizontal" && GlobalStates.newsPanelOpen) ? 1 : 0
             anchors.left: parent.left
@@ -302,6 +321,25 @@ Item {
                               : 220
                     easing.type: Easing.OutCubic
                 }
+            }
+        }
+
+        // Hombro cóncavo en el top-right de la franja del bar: extiende el bg hacia la derecha
+        // con una curva tipo notch.
+        Item {
+            id: topRightShoulder
+            width: leftDockAccent.shoulderSize
+            height: leftDockAccent.shoulderSize
+            anchors.top: leftDockAccent.top
+            anchors.left: leftDockAccent.right
+            visible: leftDockAccent.visible && !Config.showBackground
+            opacity: leftDockAccent.opacity
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: RoundCorner.CornerEnum.BottomLeft
+                size: leftDockAccent.shoulderSize
+                color: leftDockAccent.color
             }
         }
 
