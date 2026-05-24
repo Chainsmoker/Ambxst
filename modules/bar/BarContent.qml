@@ -254,7 +254,7 @@ Item {
             // Bar paint cubre el ancho del dock body. El tab rail vertical
             // fue eliminado, así que volvemos a 380px puro.
             readonly property int dockWidth: 420
-            readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 20 : 36  // debe coincidir con RightDock.qml:shoulderSize
+            readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44  // debe coincidir con RightDock.qml:shoulderSize
             visible: opacity > 0.001
             opacity: (root.orientation === "horizontal" && GlobalStates.rightDockOpen) ? 1 : 0
             anchors.right: parent.right
@@ -289,7 +289,7 @@ Item {
 
             RoundCorner {
                 anchors.fill: parent
-                corner: RoundCorner.CornerEnum.BottomRight
+                corner: RoundCorner.CornerEnum.TopRight
                 size: rightDockAccent.shoulderSize
                 color: rightDockAccent.color
             }
@@ -302,7 +302,7 @@ Item {
         StyledRect {
             id: leftDockAccent
             readonly property int dockWidth: 420
-            readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 20 : 36
+            readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
             visible: opacity > 0.001
             opacity: (root.orientation === "horizontal" && GlobalStates.newsPanelOpen) ? 1 : 0
             anchors.left: parent.left
@@ -337,7 +337,7 @@ Item {
 
             RoundCorner {
                 anchors.fill: parent
-                corner: RoundCorner.CornerEnum.BottomLeft
+                corner: RoundCorner.CornerEnum.TopLeft
                 size: leftDockAccent.shoulderSize
                 color: leftDockAccent.color
             }

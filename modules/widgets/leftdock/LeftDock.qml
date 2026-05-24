@@ -36,7 +36,7 @@ PanelWindow {
     readonly property int hPadding: 16
     readonly property int sectionSpacing: 12
     readonly property int headerHeight: 110
-    readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 20 : 36
+    readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
 
     // Tab activa: 0=Tech News, 1=CVEs
     property int currentTab: 0
