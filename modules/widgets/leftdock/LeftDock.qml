@@ -523,7 +523,7 @@ PanelWindow {
 
                                 MouseArea {
                                     anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
+                                    cursorShape: cveCard.modelData.url ? Qt.PointingHandCursor : Qt.ArrowCursor
                                     onClicked: {
                                         if (cveCard.modelData.url) {
                                             Qt.openUrlExternally(cveCard.modelData.url)

@@ -215,10 +215,16 @@ def get_cves():
             severity = "UNKNOWN"
             color = "#7f8fa6"
             
-        cve_url = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+        cve_url = ""
         cve_upper = cve_id.upper()
-        if cve_upper.startswith("RHSA-") or cve_upper.startswith("RHBA-") or cve_upper.startswith("RHEA-"):
+        if cve_upper.startswith("CVE-"):
+            cve_url = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+        elif cve_upper.startswith("RHSA-") or cve_upper.startswith("RHBA-") or cve_upper.startswith("RHEA-"):
             cve_url = f"https://access.redhat.com/errata/{cve_id}"
+        elif cve_upper.startswith("GHSA-"):
+            cve_url = f"https://github.com/advisories/{cve_id}"
+        elif cve_upper.startswith("MAL-"):
+            cve_url = f"https://osv.dev/vulnerability/{cve_id}"
 
         formatted.append({
             "cve": cve_id,
