@@ -15,6 +15,12 @@ Singleton {
     property real minTemp: 0
     property int weatherCode: 0
     property real windSpeed: 0
+    property real windDirection: 0  // grados (0=N, 90=E, 180=S, 270=W)
+    property real humidity: 0       // %
+    property real apparentTemp: 0   // sensación térmica (en unidad seleccionada)
+    property real precipitationProbability: 0  // %
+    property real uvIndex: 0
+    property var hourly: []  // [{ time, temp, precipProb }] próximas 24h
     property bool dataAvailable: false
     property bool isLoading: false
     property bool hasFailed: false
@@ -412,6 +418,30 @@ Singleton {
                             root.weatherCode = parseInt(weather.weathercode);
                             root.currentTemp = convertTemp(parseFloat(weather.temperature));
                             root.windSpeed = parseFloat(weather.windspeed);
+
+                            // Nuevos campos del bloque `current=` (Open-Meteo)
+                            if (data.current) {
+                                var cur = data.current;
+                                root.windDirection = parseFloat(cur.wind_direction_10m || 0);
+                                root.humidity = parseFloat(cur.relative_humidity_2m || 0);
+                                root.apparentTemp = convertTemp(parseFloat(cur.apparent_temperature || weather.temperature));
+                                root.precipitationProbability = parseFloat(cur.precipitation_probability || 0);
+                                root.uvIndex = parseFloat(cur.uv_index || 0);
+                            }
+
+                            // Hourly 24h
+                            if (data.hourly && data.hourly.time) {
+                                var hourlyArr = [];
+                                var hCount = Math.min(24, data.hourly.time.length);
+                                for (var k = 0; k < hCount; k++) {
+                                    hourlyArr.push({
+                                        time: data.hourly.time[k],
+                                        temp: convertTemp(parseFloat(data.hourly.temperature_2m[k])),
+                                        precipProb: parseFloat(data.hourly.precipitation_probability ? data.hourly.precipitation_probability[k] : 0)
+                                    });
+                                }
+                                root.hourly = hourlyArr;
+                            }
 
                             if (daily.temperature_2m_max && daily.temperature_2m_max.length > 0) {
                                 root.maxTemp = convertTemp(parseFloat(daily.temperature_2m_max[0]));

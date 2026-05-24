@@ -35,7 +35,7 @@ PanelWindow {
     readonly property int dockWidth: 420
     readonly property int hPadding: 16
     readonly property int sectionSpacing: 12
-    readonly property int headerHeight: 110
+    readonly property int headerHeight: 160
     readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
 
     // Tab activa: 0=Tech News, 1=CVEs
@@ -117,71 +117,71 @@ PanelWindow {
 
     readonly property int dockContainerWidth: dock.dockWidth
 
-    // Mock Data para Noticias Tech con imágenes y fallbacks
+    // Mock Data for Tech News with images and fallbacks
     readonly property var techNews: [
         {
-            title: "Gemini 2.0 Ultra de Google revoluciona la codificación de agentes autónomos",
-            source: "Hacker News · Hace 2h",
+            title: "Google's Gemini 2.0 Ultra revolutionizes autonomous agent coding",
+            source: "Hacker News · 2h ago",
             tag: "AI",
             tagColor: "#5dadeb",
             image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
-            excerpt: "La nueva arquitectura de agentes autónomos logra resolver tareas complejas de desarrollo de software con razonamiento secuencial de nivel experto."
+            excerpt: "The new autonomous agent architecture solves complex software development tasks with expert-level sequential reasoning."
         },
         {
-            title: "Kernel Linux 6.15 introduce optimizaciones de scheduler para CPUs AMD Zen 5",
-            source: "Phoronix · Hace 4h",
+            title: "Linux Kernel 6.15 introduces scheduler optimizations for AMD Zen 5 CPUs",
+            source: "Phoronix · 4h ago",
             tag: "Kernel",
             tagColor: "#E07556",
             image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&auto=format&fit=crop&q=80",
-            excerpt: "Las mejoras reducen la latencia de hilos y aumentan el rendimiento de compilación hasta en un 12% en procesadores de última generación."
+            excerpt: "The improvements reduce thread latency and boost compilation performance by up to 12% on next-gen processors."
         },
         {
-            title: "Hyprland lanza v0.48 con soporte experimental de sincronización por hardware",
-            source: "GitHub Changelog · Hace 1d",
+            title: "Hyprland releases v0.48 with experimental hardware sync support",
+            source: "GitHub Changelog · 1d ago",
             tag: "Wayland",
             tagColor: "#9fd0ec",
-            image: "", // Activará el diseño de fallback abstracto
-            excerpt: "La nueva entrega reduce significativamente el consumo de GPU al sincronizar directamente los búferes de renderizado de la pantalla."
+            image: "", // Will trigger abstract fallback design
+            excerpt: "The new release significantly reduces GPU power usage by directly synchronizing display rendering buffers."
         },
         {
-            title: "Rust consolida su adopción en componentes de seguridad crítica del sistema operativo",
-            source: "Tech Crunch · Hace 1d",
+            title: "Rust consolidates its adoption in critical system security components",
+            source: "Tech Crunch · 1d ago",
             tag: "Security",
             tagColor: "#7a4a8a",
             image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&auto=format&fit=crop&q=80",
-            excerpt: "Varias distros principales de Linux anuncian planes para migrar submódulos críticos a librerías escritas nativamente en Rust."
+            excerpt: "Several major Linux distributions announce plans to migrate critical submodules to libraries natively written in Rust."
         }
     ]
 
-    // Mock Data para CVEs
+    // Mock Data for CVEs
     readonly property var cveFeed: [
         {
             cve: "CVE-2026-12345",
             severity: "CRITICAL",
             score: "9.8",
             color: "#E07556",
-            description: "Vulnerabilidad de ejecución remota de código (RCE) en el subsistema XFRM del kernel Linux. Permite a atacantes no autenticados saltarse las protecciones de IPsec."
+            description: "Remote Code Execution (RCE) vulnerability in the Linux kernel XFRM subsystem. Allows unauthenticated attackers to bypass IPsec protections."
         },
         {
             cve: "CVE-2026-98765",
             severity: "HIGH",
             score: "8.2",
             color: "#ff8a4a",
-            description: "Desbordamiento de búfer en el daemon de OpenSSH al procesar paquetes de autenticación personalizados a través de módulos PAM específicos."
+            description: "Buffer overflow in the OpenSSH daemon when processing custom authentication packets through specific PAM modules."
         },
         {
             cve: "CVE-2026-45678",
             severity: "MEDIUM",
             score: "6.5",
             color: "#ffe57a",
-            description: "Denegación de servicio (DoS) en el compositor Hyprland. Paquetes maliciosos de IPC pueden inducir un ciclo infinito en el despachador de eventos."
+            description: "Denial of Service (DoS) in the Hyprland compositor. Malicious IPC packets can trigger an infinite loop in the event dispatcher."
         },
         {
             cve: "CVE-2026-11111",
             severity: "LOW",
             score: "3.1",
             color: "#7f8fa6",
-            description: "Divulgación de información de permisos insuficientes en el socket de comunicación UNIX local de axctl. Usuarios locales pueden leer metadatos básicos."
+            description: "Information disclosure due to insufficient permissions on the local UNIX communication socket of axctl. Local users can read basic metadata."
         }
     ]
 
@@ -251,20 +251,77 @@ PanelWindow {
             clip: true
             z: 5
 
+            // Dynamic header background image
+            Image {
+                anchors.fill: parent
+                source: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80"
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                opacity: 0.45
+            }
+
+            // Dark tint layer
+            Rectangle {
+                anchors.fill: parent
+                color: Qt.rgba(0, 0, 0, 0.35)
+            }
+
+            // Seamless gradient transition to widget bg
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "transparent" }
+                    GradientStop { position: 1.0; color: dockBg.color }
+                }
+            }
+
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: dock.hPadding
-                spacing: 4
+                spacing: 8
 
                 RowLayout {
                     Layout.fillWidth: true
 
-                    Text {
-                        text: "Feed de Noticias"
-                        color: Colors.overBackground
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(2)
-                        font.weight: Font.Bold
+                    // Live Feed Indicator
+                    Rectangle {
+                        id: liveBadge
+                        height: 22
+                        width: liveRow.implicitWidth + 16
+                        radius: 11
+                        color: Qt.rgba(1, 1, 1, 0.12)
+                        border.color: Qt.rgba(1, 1, 1, 0.2)
+                        border.width: 1
+
+                        Row {
+                            id: liveRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: "#2ecc71"
+                                anchors.verticalCenter: parent.verticalCenter
+                                
+                                SequentialAnimation on opacity {
+                                    loops: Animation.Infinite
+                                    NumberAnimation { from: 1.0; to: 0.3; duration: 800; easing.type: Easing.InOutQuad }
+                                    NumberAnimation { from: 0.3; to: 1.0; duration: 800; easing.type: Easing.InOutQuad }
+                                }
+                            }
+
+                            Text {
+                                text: "LIVE FEED"
+                                color: "white"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-2)
+                                font.weight: Font.Bold
+                                font.letterSpacing: 1
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
                     }
 
                     Item { Layout.fillWidth: true }
@@ -278,7 +335,7 @@ PanelWindow {
                         Rectangle {
                             anchors.fill: parent
                             radius: 16
-                            color: closeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.15) : "transparent"
+                            color: closeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : "transparent"
                             Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
@@ -287,7 +344,7 @@ PanelWindow {
                             text: Icons.cancel
                             font.family: Icons.font
                             font.pixelSize: 16
-                            color: Colors.outline
+                            color: "white"
                         }
 
                         MouseArea {
@@ -300,12 +357,27 @@ PanelWindow {
                     }
                 }
 
-                Text {
-                    text: "Mantente al día con lo último en tecnología y seguridad"
-                    color: Colors.outline
-                    font.family: Config.theme.font
-                    font.pixelSize: Styling.fontSize(-1)
+                ColumnLayout {
                     Layout.fillWidth: true
+                    spacing: 2
+
+                    Text {
+                        text: "News & Security"
+                        color: "white"
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(3)
+                        font.weight: Font.ExtraBold
+                        Layout.fillWidth: true
+                    }
+
+                    Text {
+                        text: "Your curated tech and vulnerability updates"
+                        color: Qt.rgba(255, 255, 255, 0.8)
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-1)
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
         }
@@ -358,7 +430,7 @@ PanelWindow {
             Repeater {
                 model: [
                     { ico: Icons.globe, name: "Tech News" },
-                    { ico: Icons.shield, name: "Últimos CVEs" }
+                    { ico: Icons.shield, name: "Latest CVEs" }
                 ]
 
                 Rectangle {

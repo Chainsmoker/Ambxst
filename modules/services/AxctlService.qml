@@ -166,6 +166,21 @@ Singleton {
         }
         onExited: (code) => {
             console.warn("axctl daemon exited with code:", code)
+            // El daemon es la fuente de verdad — si muere, hay que relanzarlo
+            // o `axctl subscribe` queda permanentemente desconectado.
+            daemonRestartTimer.restart();
+        }
+    }
+
+    // Relanza el daemon si muere (e.g. tras un reload de quickshell que dejó la socket viva un instante)
+    Timer {
+        id: daemonRestartTimer
+        interval: 1500
+        repeat: false
+        onTriggered: {
+            if (!axctlProcess.running) {
+                axctlProcess.running = true;
+            }
         }
     }
 
@@ -190,8 +205,14 @@ Singleton {
         stdout: SplitParser {
             onRead: (data) => {
                 if (!data) return;
+                // axctl puede emitir mensajes de error en texto plano (e.g.
+                // "Connection closed or error: EOF" cuando el daemon muere).
+                // Filtramos a líneas que parezcan JSON antes de parsear para no
+                // spamear el log con SyntaxError en cada desconexión.
+                const trimmed = data.trim();
+                if (!trimmed.startsWith('{')) return;
                 try {
-                    let parsedJson = JSON.parse(data);
+                    let parsedJson = JSON.parse(trimmed);
 
                     // Apply inline state immediately (every event carries full state)
                     if (parsedJson.state) {
@@ -208,14 +229,16 @@ Singleton {
             }
         }
         onExited: (code) => {
-            console.warn("axctl subscribe exited:", code);
+            // Code 1 con daemon vivo es normal al perder conexión; sólo logueamos si es otro código.
+            if (code !== 1) console.warn("axctl subscribe exited:", code);
             reconnectTimer.restart();
         }
     }
 
     Component.onDestruction: {
         reconnectTimer.running = false
-        axctlProcess.running = false
+        daemonRestartTimer.running = false
         axctlSubscribe.running = false
+        axctlProcess.running = false
     }
 }

@@ -51,6 +51,10 @@ QtObject {
 
             // System
             case "overview": toggleSimpleModule("overview"); break;
+            case "windowswitcher": cycleWindowSwitcher(1); break;
+            case "windowswitcher-prev": cycleWindowSwitcher(-1); break;
+            case "workspaceswitcher": cycleWorkspaceSwitcher(1); break;
+            case "workspaceswitcher-prev": cycleWorkspaceSwitcher(-1); break;
             case "powermenu": toggleSimpleModule("powermenu"); break;
             case "tools": toggleSimpleModule("tools"); break;
             case "config": toggleSettings(); break;
@@ -92,6 +96,30 @@ QtObject {
             Visibilities.setActiveModule("");
         }
         GlobalStates.settingsWindowVisible = willOpen;
+    }
+
+    signal windowSwitcherCycle(int direction)
+    signal workspaceSwitcherCycle(int direction)
+
+    function cycleWorkspaceSwitcher(direction) {
+        const focusedScreen = AxctlService.focusedMonitor ? AxctlService.focusedMonitor.name : "";
+        const screenProps = focusedScreen ? Visibilities.getForScreen(focusedScreen) : null;
+        if (!screenProps || !screenProps.workspaceswitcher) {
+            Visibilities.setActiveModule("workspaceswitcher");
+        } else {
+            root.workspaceSwitcherCycle(direction);
+        }
+    }
+
+    function cycleWindowSwitcher(direction) {
+        const focusedScreen = AxctlService.focusedMonitor ? AxctlService.focusedMonitor.name : "";
+        const screenProps = focusedScreen ? Visibilities.getForScreen(focusedScreen) : null;
+        if (!screenProps || !screenProps.windowswitcher) {
+            // Abrir instantáneo — WindowThumbnails ya pre-capturó al cambiar foco/workspace.
+            Visibilities.setActiveModule("windowswitcher");
+        } else {
+            root.windowSwitcherCycle(direction);
+        }
     }
 
     function toggleSimpleModule(moduleName) {

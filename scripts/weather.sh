@@ -81,7 +81,12 @@ fetch_weather() {
 	local lat="$1"
 	local lon="$2"
 
-	local url="https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,weathercode&timezone=auto&forecast_days=7"
+	local url="https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}"
+	url+="&current_weather=true"
+	url+="&current=relative_humidity_2m,apparent_temperature,precipitation_probability,uv_index,wind_direction_10m"
+	url+="&hourly=temperature_2m,precipitation_probability&forecast_hours=24"
+	url+="&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,weathercode"
+	url+="&timezone=auto&forecast_days=7"
 
 	local response
 	response=$(http_get "$url")
