@@ -13,9 +13,12 @@ import qs.modules.widgets.dashboard.wallpapers
 
 import qs.modules.notch
 import qs.modules.widgets.overview
+import qs.modules.widgets.windowswitcher
+import qs.modules.widgets.workspaceswitcher
 import qs.modules.widgets.presets
 import qs.modules.widgets.controlpanel
 import qs.modules.widgets.rightdock
+import qs.modules.widgets.leftdock
 import qs.modules.services
 import qs.modules.corners
 import qs.modules.frame
@@ -146,6 +149,46 @@ ShellRoot {
         }
     }
 
+    // Workspace switcher popup (Alt+Tab 3D cube)
+    Variants {
+        model: {
+            const screens = Quickshell.screens;
+            const list = (Config.bar && Config.bar.screenList !== undefined ? Config.bar.screenList : []);
+            if (!list || list.length === 0)
+                return screens;
+            return screens.filter(screen => list.indexOf(screen.name) !== -1);
+        }
+
+        Loader {
+            id: workspaceSwitcherLoader
+            active: SuspendManager.wakeReady && (Visibilities.getForScreen(modelData.name) ? Visibilities.getForScreen(modelData.name).workspaceswitcher : false)
+            required property ShellScreen modelData
+            sourceComponent: WorkspaceSwitcherPopup {
+                screen: workspaceSwitcherLoader.modelData
+            }
+        }
+    }
+
+    // Window switcher popup (Super+Tab coverflow)
+    Variants {
+        model: {
+            const screens = Quickshell.screens;
+            const list = (Config.bar && Config.bar.screenList !== undefined ? Config.bar.screenList : []);
+            if (!list || list.length === 0)
+                return screens;
+            return screens.filter(screen => list.indexOf(screen.name) !== -1);
+        }
+
+        Loader {
+            id: windowSwitcherLoader
+            active: SuspendManager.wakeReady && (Visibilities.getForScreen(modelData.name) ? Visibilities.getForScreen(modelData.name).windowswitcher : false)
+            required property ShellScreen modelData
+            sourceComponent: WindowSwitcherPopup {
+                screen: windowSwitcherLoader.modelData
+            }
+        }
+    }
+
     // Presets popup
     Variants {
         model: {
@@ -209,6 +252,22 @@ ShellRoot {
         }
 
         RightDock {
+            required property ShellScreen modelData
+            screen: modelData
+        }
+    }
+
+    // LeftDock — news tech + CVE feed
+    Variants {
+        model: {
+            const screens = Quickshell.screens;
+            const list = (Config.bar && Config.bar.screenList !== undefined ? Config.bar.screenList : []);
+            if (!list || list.length === 0)
+                return screens;
+            return screens.filter(screen => list.indexOf(screen.name) !== -1);
+        }
+
+        LeftDock {
             required property ShellScreen modelData
             screen: modelData
         }

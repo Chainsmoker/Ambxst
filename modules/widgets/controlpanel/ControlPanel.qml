@@ -98,15 +98,11 @@ PanelWindow {
                 anchors.margins: 8
                 spacing: 8
 
-                // Lista de iconos — por ahora visual
+                // Lista de iconos — Chat y Noticias
                 Repeater {
                     model: [
-                        { id: "chat",      icon: Icons.robot,     label: "Chat" },
-                        { id: "audio",     icon: Icons.note,      label: "Audio" },
-                        { id: "wifi",      icon: Icons.wifiHigh,  label: "Red" },
-                        { id: "bluetooth", icon: Icons.bluetooth, label: "Bluetooth" },
-                        { id: "brightness",icon: Icons.sun,       label: "Brillo" },
-                        { id: "settings",  icon: Icons.gear,      label: "Sistema" }
+                        { id: "chat", icon: Icons.robot,     label: "Chat" },
+                        { id: "news", icon: Icons.globe,     label: "Noticias" }
                     ]
 
                     delegate: Item {
@@ -115,7 +111,11 @@ PanelWindow {
                         Layout.preferredWidth: 40
                         Layout.preferredHeight: 40
 
-                        readonly property bool isActive: modelData.id === "chat" && GlobalStates.chatPanelOpen
+                        readonly property bool isActive: {
+                            if (modelData.id === "chat") return GlobalStates.chatPanelOpen;
+                            if (modelData.id === "news") return GlobalStates.newsPanelOpen;
+                            return false;
+                        }
 
                         Rectangle {
                             anchors.fill: parent
@@ -149,9 +149,8 @@ PanelWindow {
                             onClicked: {
                                 if (parent.modelData.id === "chat") {
                                     GlobalStates.chatPanelOpen = !GlobalStates.chatPanelOpen;
-                                } else {
-                                    // TODO: otros iconos
-                                    console.log("SideNotch click:", parent.modelData.label);
+                                } else if (parent.modelData.id === "news") {
+                                    GlobalStates.newsPanelOpen = !GlobalStates.newsPanelOpen;
                                 }
                             }
                         }
