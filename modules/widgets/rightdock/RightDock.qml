@@ -41,6 +41,11 @@ PanelWindow {
     // Tamaño del hombro cóncavo (bottom-left del dock y top-left de la franja del bar)
     readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
 
+    readonly property bool barAtTop: {
+        const pos = Config.bar?.position ?? "top";
+        return pos === "top";
+    }
+
     // Tab activa: 0=Calendar, 1=Weather, 2=Pomodoro, 3=ColorPicker
     property int currentTab: 0
     readonly property int tabBarHeight: 64  // altura reservada arriba para las pills floating
@@ -69,8 +74,8 @@ PanelWindow {
     mask: Region {
         regions: [
             Region { item: dock.visible ? fullMask : emptyMask },
-            Region { item: (dock.visible && (!(Config.bar?.position === "top") || Config.showBackground)) ? topLeftShoulder : null },
-            Region { item: (dock.visible && ((Config.bar?.position === "top") || Config.showBackground)) ? bottomLeftShoulder : null }
+            Region { item: (dock.visible && (!dock.barAtTop || Config.showBackground)) ? topLeftShoulder : null },
+            Region { item: (dock.visible && !dock.barAtTop && Config.showBackground) ? bottomLeftShoulder : null }
         ]
     }
     Item {
@@ -165,7 +170,7 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.top: dockBg.top
             anchors.right: dockBg.left
-            visible: !(Config.bar?.position === "top") || Config.showBackground
+            visible: !dock.barAtTop || Config.showBackground
 
             RoundCorner {
                 anchors.fill: parent
@@ -183,7 +188,7 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.bottom: dockBg.bottom
             anchors.right: dockBg.left
-            visible: (Config.bar?.position === "top") || Config.showBackground
+            visible: !dock.barAtTop && Config.showBackground
 
             RoundCorner {
                 anchors.fill: parent
