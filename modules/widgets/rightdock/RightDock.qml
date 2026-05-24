@@ -69,8 +69,8 @@ PanelWindow {
     mask: Region {
         regions: [
             Region { item: dock.visible ? fullMask : emptyMask },
-            Region { item: (dock.visible && (Config.bar?.position === "top") && Config.showBackground) ? topLeftShoulder : null },
-            Region { item: (dock.visible && (Config.bar?.position === "bottom") && Config.showBackground) ? bottomLeftShoulder : null }
+            Region { item: (dock.visible && (!(Config.bar?.position === "top") || Config.showBackground)) ? topLeftShoulder : null },
+            Region { item: (dock.visible && ((Config.bar?.position === "top") || Config.showBackground)) ? bottomLeftShoulder : null }
         ]
     }
     Item {
@@ -165,7 +165,7 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.top: dockBg.top
             anchors.right: dockBg.left
-            visible: (Config.bar?.position === "top") && Config.showBackground
+            visible: !(Config.bar?.position === "top") || Config.showBackground
 
             RoundCorner {
                 anchors.fill: parent
@@ -183,7 +183,7 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.bottom: dockBg.bottom
             anchors.right: dockBg.left
-            visible: (Config.bar?.position === "bottom") && Config.showBackground
+            visible: (Config.bar?.position === "top") || Config.showBackground
 
             RoundCorner {
                 anchors.fill: parent
