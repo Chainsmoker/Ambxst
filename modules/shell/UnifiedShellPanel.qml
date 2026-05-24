@@ -247,7 +247,6 @@ PanelWindow {
             unifiedEffectActive: unifiedPanel.unifiedEffectActive
             anchors.fill: parent
             screen: unifiedPanel.targetScreen
-            reveal: notchContent.reveal
             z: 4
         }
 

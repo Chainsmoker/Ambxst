@@ -14,13 +14,8 @@ Item {
     id: root
 
     required property ShellScreen screen
-    property bool reveal: false
     property bool unifiedEffectActive: false
 
-    readonly property string notchPosition: Config.notchPosition !== undefined ? Config.notchPosition : "top"
-    readonly property bool isIsland: Config.notchTheme === "island"
-    readonly property int baseHeight: isIsland ? 36 : (Config.showBackground ? 44 : 40)
-    
     readonly property bool activeWindowFullscreen: {
         const toplevel = ToplevelManager.activeToplevel;
         if (!toplevel || !toplevel.activated)
@@ -28,26 +23,24 @@ Item {
         return toplevel.fullscreen === true;
     }
 
-    readonly property int frameOffset: (Config.bar && Config.bar.frameEnabled && !activeWindowFullscreen) ? ((Config.bar.frameThickness !== undefined) ? Config.bar.frameThickness : 6) : 0
+    // Disable the hover trigger in fullscreen unless the bar is configured to show in fullscreen
+    readonly property bool enabled: !activeWindowFullscreen || (Config.bar && Config.bar.availableOnFullscreen === true)
 
-    // Full screen container to align and translate easily
-    Item {
-        id: leftNotchContainer
-        
-        width: 48
-        height: baseHeight
+    // Hover state controls the slide-out reveal
+    readonly property bool reveal: enabled && (hoverArea.containsMouse || GlobalStates.newsPanelOpen)
 
-        x: isIsland ? (frameOffset + 12) : 0
-        y: {
-            if (notchPosition === "top") {
-                return isIsland ? (frameOffset + 4) : frameOffset;
-            } else {
-                return isIsland ? (parent.height - frameOffset - height - 4) : (parent.height - frameOffset - height);
-            }
-        }
+    // The dimensions of the visual pill
+    readonly property int pillSize: 48
 
-        opacity: root.reveal ? 1 : 0
-        Behavior on opacity {
+    MouseArea {
+        id: hoverArea
+        hoverEnabled: true
+        anchors.verticalCenter: parent.verticalCenter
+        x: 0
+        width: root.reveal ? (root.pillSize + 16) : 10
+        height: root.pillSize + 24
+
+        Behavior on width {
             enabled: Config.animDuration > 0
             NumberAnimation {
                 duration: Config.animDuration / 2
@@ -55,61 +48,52 @@ Item {
             }
         }
 
-        transform: Translate {
-            y: {
-                if (root.reveal) return 0;
-                if (root.notchPosition === "top")
-                    return -(leftNotchContainer.height + 16);
-                else
-                    return (leftNotchContainer.height + 16);
-            }
-            Behavior on y {
+        // Visual pill
+        StyledRect {
+            id: pill
+            variant: "bg"
+            width: root.pillSize
+            height: root.pillSize
+            anchors.verticalCenter: parent.verticalCenter
+            
+            // Slide in animation: x is -width (hidden offscreen) when closed, 8px padding when revealed
+            x: root.reveal ? 8 : -width
+
+            Behavior on x {
                 enabled: Config.animDuration > 0
                 NumberAnimation {
-                    duration: Config.animDuration / 2
-                    easing.type: Easing.OutCubic
+                    duration: Config.animDuration
+                    easing.type: root.reveal ? Easing.OutBack : Easing.OutQuart
+                    easing.overshoot: root.reveal ? 1.15 : 1.0
                 }
             }
-        }
 
-        // Shadow for island theme
-        layer.enabled: isIsland
-        layer.effect: Shadow {}
-
-        StyledRect {
-            id: bgRect
-            anchors.fill: parent
-            variant: "bg"
+            radius: width / 2 // fully rounded circle
             enableBorder: !root.unifiedEffectActive
-            animateRadius: false
-            
-            radius: isIsland ? 18 : 0
-            topLeftRadius: isIsland ? 18 : (notchPosition === "bottom" ? (Config.roundness > 0 ? Config.roundness + 4 : 0) : 0)
-            topRightRadius: isIsland ? 18 : (notchPosition === "bottom" ? (Config.roundness > 0 ? Config.roundness + 4 : 0) : 0)
-            bottomLeftRadius: isIsland ? 18 : (notchPosition === "top" ? (Config.roundness > 0 ? Config.roundness + 4 : 0) : 0)
-            bottomRightRadius: isIsland ? 18 : (notchPosition === "top" ? (Config.roundness > 0 ? Config.roundness + 4 : 0) : 0)
-        }
 
-        // Button Area
-        MouseArea {
-            id: clickArea
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
+            layer.enabled: true
+            layer.effect: Shadow {}
 
-            onClicked: {
-                GlobalStates.newsPanelOpen = !GlobalStates.newsPanelOpen;
-            }
+            // Toggle button
+            MouseArea {
+                id: clickArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
 
-            // Icon inside
-            Text {
-                text: Icons.globe
-                font.family: Icons.font
-                font.pixelSize: 16
-                anchors.centerIn: parent
-                color: GlobalStates.newsPanelOpen ? Colors.primary : (clickArea.containsMouse ? Colors.primary : Colors.text)
-                Behavior on color {
-                    ColorAnimation { duration: 150 }
+                onClicked: {
+                    GlobalStates.newsPanelOpen = !GlobalStates.newsPanelOpen;
+                }
+
+                Text {
+                    text: Icons.globe
+                    font.family: Icons.font
+                    font.pixelSize: 18
+                    anchors.centerIn: parent
+                    color: GlobalStates.newsPanelOpen ? Colors.primary : (clickArea.containsMouse ? Colors.primary : Colors.text)
+                    Behavior on color {
+                        ColorAnimation { duration: 150 }
+                    }
                 }
             }
         }
