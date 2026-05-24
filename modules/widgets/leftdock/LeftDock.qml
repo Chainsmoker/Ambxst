@@ -29,8 +29,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
 
     readonly property bool isOpen: GlobalStates.newsPanelOpen
-    // Ocultar PanelWindow cuando cerrado para no bloquear clicks del sistema.
-    visible: isOpen || dockContainer.opacity > 0.001
+    // Siempre visible para permitir que la máscara hoverStrip reciba eventos del cursor cuando está cerrado.
+    visible: true
 
     readonly property int dockWidth: 420
     readonly property int hPadding: 16
@@ -64,8 +64,8 @@ PanelWindow {
 
     implicitWidth: dockWidth + 32
 
-    // Patrón ChatPanel: cerrado → emptyMask (no intercepta), abierto → fullMask.
-    mask: Region { item: dock.visible ? fullMask : emptyMask }
+    // Patrón mask: cerrado → hoverStrip, abierto → fullMask.
+    mask: Region { item: dock.isOpen ? fullMask : hoverStrip }
     Item {
         id: fullMask
         x: 0
@@ -73,7 +73,41 @@ PanelWindow {
         width: dock.dockWidth
         height: dock.height - dock.barReserved
     }
-    Item { id: emptyMask; width: 0; height: 0 }
+    Item {
+        id: hoverStrip
+        x: 0
+        y: dock.barReserved
+        width: 10
+        height: dock.height - dock.barReserved
+    }
+
+    // Gatillo de hover lateral en el borde izquierdo
+    Item {
+        id: hoverTrigger
+        x: 0
+        y: dock.barReserved
+        width: 10
+        height: dock.height - dock.barReserved
+        visible: !dock.isOpen
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered && !dock.isOpen) {
+                    GlobalStates.newsPanelOpen = true;
+                }
+            }
+        }
+    }
+
+    // Temporizador para auto-cerrar el panel tras 600ms de inactividad del cursor
+    Timer {
+        id: closeTimer
+        interval: 600
+        repeat: false
+        onTriggered: {
+            GlobalStates.newsPanelOpen = false;
+        }
+    }
 
     readonly property int dockContainerWidth: dock.dockWidth
 
@@ -84,7 +118,7 @@ PanelWindow {
             source: "Hacker News · Hace 2h",
             tag: "AI",
             tagColor: "#5dadeb",
-            image: "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=150&auto=format&fit=crop&q=60",
+            image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
             excerpt: "La nueva arquitectura de agentes autónomos logra resolver tareas complejas de desarrollo de software con razonamiento secuencial de nivel experto."
         },
         {
@@ -92,7 +126,7 @@ PanelWindow {
             source: "Phoronix · Hace 4h",
             tag: "Kernel",
             tagColor: "#E07556",
-            image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?w=150&auto=format&fit=crop&q=60",
+            image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&auto=format&fit=crop&q=80",
             excerpt: "Las mejoras reducen la latencia de hilos y aumentan el rendimiento de compilación hasta en un 12% en procesadores de última generación."
         },
         {
@@ -108,7 +142,7 @@ PanelWindow {
             source: "Tech Crunch · Hace 1d",
             tag: "Security",
             tagColor: "#7a4a8a",
-            image: "https://images.unsplash.com/photo-1607799279861-4dd421887fb3?w=150&auto=format&fit=crop&q=60",
+            image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&auto=format&fit=crop&q=80",
             excerpt: "Varias distros principales de Linux anuncian planes para migrar submódulos críticos a librerías escritas nativamente en Rust."
         }
     ]
@@ -154,6 +188,17 @@ PanelWindow {
         anchors.bottom: parent.bottom
         opacity: dock.isOpen ? 1 : 0
         visible: opacity > 0.001
+
+        HoverHandler {
+            id: dockHoverHandler
+            onHoveredChanged: {
+                if (!hovered && dock.isOpen) {
+                    closeTimer.restart();
+                } else {
+                    closeTimer.stop();
+                }
+            }
+        }
 
         transform: Translate {
             id: slideTransform
@@ -361,7 +406,6 @@ PanelWindow {
                     Layout.fillWidth: true
                     currentIndex: dock.currentTab
 
-                    // TAB 0: Noticias Tech (con Layout asimétrico e imágenes)
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 12
@@ -372,35 +416,122 @@ PanelWindow {
                             delegate: StyledRect {
                                 id: cardRect
                                 required property var modelData
+                                required property int index
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: contentRow.implicitHeight + 24
+                                Layout.preferredHeight: contentColumn.implicitHeight + 16
                                 variant: "internalbg"
-                                radius: 14
+                                radius: 16
                                 enableShadow: false
 
-                                RowLayout {
-                                    id: contentRow
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 12
+                                property bool isHovered: false
+                                scale: isHovered ? 1.02 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
-                                    // Lado Izquierdo: Textos
-                                    ColumnLayout {
+                                HoverHandler {
+                                    onHoveredChanged: cardRect.isHovered = hovered
+                                }
+
+                                ColumnLayout {
+                                    id: contentColumn
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    spacing: 0
+
+                                    // Top Section: Image or Fallback
+                                    Item {
+                                        id: imageArea
                                         Layout.fillWidth: true
-                                        spacing: 6
+                                        Layout.preferredHeight: 180
+                                        clip: true
 
-                                        RowLayout {
-                                            Layout.fillWidth: true
+                                        layer.enabled: true
+                                        layer.effect: MultiEffect {
+                                            maskEnabled: true
+                                            maskSource: imageMaskShape
+                                        }
+
+                                        Item {
+                                            id: imageMaskShape
+                                            anchors.fill: parent
+                                            visible: false
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                topLeftRadius: 16
+                                                topRightRadius: 16
+                                                bottomLeftRadius: 0
+                                                bottomRightRadius: 0
+                                                color: "black"
+                                            }
+                                        }
+
+                                        // Fallback Bg
+                                        Rectangle {
+                                            id: fallbackBg
+                                            anchors.fill: parent
+                                            visible: !thumbImage.visible
+                                            gradient: Gradient {
+                                                GradientStop { position: 0.0; color: cardRect.modelData.tagColor }
+                                                GradientStop { position: 1.0; color: Qt.darker(cardRect.modelData.tagColor, 1.8) }
+                                            }
 
                                             Rectangle {
-                                                width: tagText.implicitWidth + 12
-                                                height: 22
-                                                radius: 6
-                                                color: cardRect.modelData.tagColor
+                                                width: 120
+                                                height: 120
+                                                radius: 60
+                                                color: Qt.rgba(1, 1, 1, 0.1)
+                                                x: parent.width - 60
+                                                y: -30
+                                            }
 
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: cardRect.modelData.tag
+                                                color: Qt.rgba(1, 1, 1, 0.9)
+                                                font.family: Config.theme.font
+                                                font.pixelSize: 36
+                                                font.weight: Font.Bold
+                                                font.letterSpacing: 2
+                                            }
+                                        }
+
+                                        // Actual Image
+                                        Image {
+                                            id: thumbImage
+                                            anchors.fill: parent
+                                            source: cardRect.modelData.image || ""
+                                            visible: cardRect.modelData.image !== "" && status === Image.Ready
+                                            fillMode: Image.PreserveAspectCrop
+                                            asynchronous: true
+                                            cache: true
+
+                                            scale: cardRect.isHovered ? 1.05 : 1.0
+                                            Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
+                                        }
+
+                                        // Floating tag badge
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.margins: 12
+                                            height: 24
+                                            width: tagText.implicitWidth + 16
+                                            radius: 12
+                                            color: Qt.rgba(0, 0, 0, 0.6)
+                                            border.color: Qt.rgba(1, 1, 1, 0.2)
+                                            border.width: 1
+
+                                            RowLayout {
+                                                anchors.centerIn: parent
+                                                spacing: 4
+                                                Rectangle {
+                                                    width: 6
+                                                    height: 6
+                                                    radius: 3
+                                                    color: cardRect.modelData.tagColor
+                                                }
                                                 Text {
                                                     id: tagText
-                                                    anchors.centerIn: parent
                                                     text: cardRect.modelData.tag
                                                     color: "white"
                                                     font.family: Config.theme.font
@@ -408,15 +539,21 @@ PanelWindow {
                                                     font.weight: Font.Bold
                                                 }
                                             }
+                                        }
+                                    }
 
-                                            Item { Layout.fillWidth: true }
+                                    // Bottom Section: Info and Text
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.margins: 16
+                                        spacing: 8
 
-                                            Text {
-                                                text: cardRect.modelData.source
-                                                color: Colors.outline
-                                                font.family: Config.theme.font
-                                                font.pixelSize: Styling.fontSize(-2)
-                                            }
+                                        Text {
+                                            text: cardRect.modelData.source
+                                            color: Colors.outline
+                                            font.family: Config.theme.font
+                                            font.pixelSize: Styling.fontSize(-2)
+                                            opacity: 0.8
                                         }
 
                                         Text {
@@ -427,6 +564,7 @@ PanelWindow {
                                             font.weight: Font.Bold
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
+                                            lineHeight: 1.15
                                         }
 
                                         Text {
@@ -437,64 +575,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
                                             opacity: 0.85
-                                        }
-                                    }
-
-                                    // Lado Derecho: Thumbnail / Fallback
-                                    Item {
-                                        id: imageContainer
-                                        Layout.preferredWidth: 80
-                                        Layout.preferredHeight: 80
-                                        Layout.alignment: Qt.AlignTop
-
-                                        // Fallback degradado abstracto
-                                        Rectangle {
-                                            id: fallbackBg
-                                            anchors.fill: parent
-                                            radius: 10
-                                            visible: !thumbImage.visible
-                                            gradient: Gradient {
-                                                GradientStop { position: 0.0; color: cardRect.modelData.tagColor }
-                                                GradientStop { position: 1.0; color: Qt.darker(cardRect.modelData.tagColor, 1.6) }
-                                            }
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: cardRect.modelData.tag.charAt(0)
-                                                color: "white"
-                                                font.family: Config.theme.font
-                                                font.pixelSize: 32
-                                                font.weight: Font.Bold
-                                            }
-                                        }
-
-                                        // Imagen real
-                                        Image {
-                                            id: thumbImage
-                                            anchors.fill: parent
-                                            source: cardRect.modelData.image || ""
-                                            visible: cardRect.modelData.image !== "" && status === Image.Ready
-                                            fillMode: Image.PreserveAspectCrop
-                                            asynchronous: true
-                                            cache: true
-
-                                            layer.enabled: true
-                                            layer.effect: MultiEffect {
-                                                maskEnabled: true
-                                                maskSource: maskShape
-                                            }
-                                        }
-
-                                        // Máscara redondeada para la imagen
-                                        Item {
-                                            id: maskShape
-                                            anchors.fill: parent
-                                            visible: false
-                                            Rectangle {
-                                                anchors.fill: parent
-                                                radius: 10
-                                                color: "black"
-                                            }
+                                            lineHeight: 1.2
                                         }
                                     }
                                 }
@@ -502,7 +583,6 @@ PanelWindow {
                         }
                     }
 
-                    // TAB 1: CVE Feed
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 12
@@ -513,52 +593,120 @@ PanelWindow {
                             delegate: StyledRect {
                                 id: cveCard
                                 required property var modelData
+                                required property int index
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: cveRow.implicitHeight + 24
+                                Layout.preferredHeight: cveCol.implicitHeight + 16
                                 variant: "internalbg"
-                                radius: 14
+                                radius: 16
                                 enableShadow: false
 
-                                RowLayout {
-                                    id: cveRow
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 12
+                                property bool isHovered: false
+                                scale: isHovered ? 1.02 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
-                                    ColumnLayout {
+                                HoverHandler {
+                                    onHoveredChanged: cveCard.isHovered = hovered
+                                }
+
+                                ColumnLayout {
+                                    id: cveCol
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    spacing: 0
+
+                                    // Top Section: Severity Gradient & Shield
+                                    Item {
+                                        id: cveHeaderArea
                                         Layout.fillWidth: true
-                                        spacing: 6
+                                        Layout.preferredHeight: 120
+                                        clip: true
 
-                                        RowLayout {
-                                            Layout.fillWidth: true
+                                        layer.enabled: true
+                                        layer.effect: MultiEffect {
+                                            maskEnabled: true
+                                            maskSource: cveMaskShape
+                                        }
+
+                                        Item {
+                                            id: cveMaskShape
+                                            anchors.fill: parent
+                                            visible: false
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                topLeftRadius: 16
+                                                topRightRadius: 16
+                                                bottomLeftRadius: 0
+                                                bottomRightRadius: 0
+                                                color: "black"
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            gradient: Gradient {
+                                                GradientStop { position: 0.0; color: cveCard.modelData.color }
+                                                GradientStop { position: 1.0; color: Qt.darker(cveCard.modelData.color, 1.8) }
+                                            }
+
+                                            Rectangle {
+                                                width: 80
+                                                height: 80
+                                                radius: 40
+                                                color: Qt.rgba(1, 1, 1, 0.08)
+                                                x: parent.width - 40
+                                                y: -20
+                                            }
 
                                             Text {
-                                                text: cveCard.modelData.cve
-                                                color: Colors.overBackground
-                                                font.family: Config.theme.monoFont
-                                                font.pixelSize: Styling.fontSize(0)
+                                                anchors.centerIn: parent
+                                                text: Icons.shield
+                                                color: Qt.rgba(1, 1, 1, 0.9)
+                                                font.family: Icons.font
+                                                font.pixelSize: 48
+                                                
+                                                scale: cveCard.isHovered ? 1.1 : 1.0
+                                                Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
+                                            }
+                                        }
+
+                                        // Floating severity badge
+                                        Rectangle {
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.margins: 12
+                                            height: 24
+                                            width: sevText.implicitWidth + 16
+                                            radius: 12
+                                            color: Qt.rgba(0, 0, 0, 0.6)
+                                            border.color: Qt.rgba(1, 1, 1, 0.2)
+                                            border.width: 1
+
+                                            Text {
+                                                id: sevText
+                                                anchors.centerIn: parent
+                                                text: cveCard.modelData.severity + " (" + cveCard.modelData.score + ")"
+                                                color: "white"
+                                                font.family: Config.theme.font
+                                                font.pixelSize: Styling.fontSize(-2)
                                                 font.weight: Font.Bold
                                             }
+                                        }
+                                    }
 
-                                            Item { Layout.fillWidth: true }
+                                    // Bottom Section: Info and Text
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.margins: 16
+                                        spacing: 8
 
-                                            // Badge de severidad
-                                            Rectangle {
-                                                width: sevText.implicitWidth + 12
-                                                height: 20
-                                                radius: 6
-                                                color: cveCard.modelData.color
-
-                                                Text {
-                                                    id: sevText
-                                                    anchors.centerIn: parent
-                                                    text: cveCard.modelData.severity + " (" + cveCard.modelData.score + ")"
-                                                    color: "white"
-                                                    font.family: Config.theme.font
-                                                    font.pixelSize: Styling.fontSize(-2)
-                                                    font.weight: Font.Bold
-                                                }
-                                            }
+                                        Text {
+                                            text: cveCard.modelData.cve
+                                            color: Colors.overBackground
+                                            font.family: Config.theme.monoFont
+                                            font.pixelSize: Styling.fontSize(0)
+                                            font.weight: Font.Bold
+                                            Layout.fillWidth: true
                                         }
 
                                         Text {
@@ -569,30 +717,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
                                             opacity: 0.85
-                                        }
-                                    }
-
-                                    // Lado Derecho: Icono de Escudo Simétrico
-                                    Item {
-                                        Layout.preferredWidth: 80
-                                        Layout.preferredHeight: 80
-                                        Layout.alignment: Qt.AlignTop
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            radius: 10
-                                            gradient: Gradient {
-                                                GradientStop { position: 0.0; color: cveCard.modelData.color }
-                                                GradientStop { position: 1.0; color: Qt.darker(cveCard.modelData.color, 1.6) }
-                                            }
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: Icons.shield
-                                                color: "white"
-                                                font.family: Icons.font
-                                                font.pixelSize: 32
-                                            }
+                                            lineHeight: 1.2
                                         }
                                     }
                                 }
