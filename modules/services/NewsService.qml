@@ -10,17 +10,17 @@ Singleton {
     // Exposed Feeds
     property var techNews: []
     property var cveFeed: []
-    property var redisFeed: []
+    property var redditFeed: []
 
     // Loading States
     property bool isLoadingNews: false
     property bool isLoadingCve: false
-    property bool isLoadingRedis: false
+    property bool isLoadingReddit: false
 
     // Failure States
     property bool newsFailed: false
     property bool cveFailed: false
-    property bool redisFailed: false
+    property bool redditFailed: false
 
     readonly property string pythonScript: Quickshell.shellDir + "/scripts/news_fetcher.py"
 
@@ -32,7 +32,7 @@ Singleton {
         onTriggered: {
             root.updateNews()
             root.updateCve()
-            root.updateRedis()
+            root.updateReddit()
         }
     }
 
@@ -40,7 +40,7 @@ Singleton {
     Component.onCompleted: {
         root.updateNews()
         root.updateCve()
-        root.updateRedis()
+        root.updateReddit()
     }
 
     // Refresh functions
@@ -62,13 +62,13 @@ Singleton {
         cveProcess.running = true
     }
 
-    function updateRedis() {
-        if (redisProcess.running) {
-            redisProcess.running = false
+    function updateReddit() {
+        if (redditProcess.running) {
+            redditProcess.running = false
         }
-        root.isLoadingRedis = true
-        root.redisFailed = false
-        redisProcess.running = true
+        root.isLoadingReddit = true
+        root.redditFailed = false
+        redditProcess.running = true
     }
 
     // Processes
@@ -130,30 +130,30 @@ Singleton {
         }
     }
 
-    property Process redisProcess: Process {
+    property Process redditProcess: Process {
         running: false
-        command: ["python3", root.pythonScript, "redis"]
+        command: ["python3", root.pythonScript, "reddit"]
 
         stdout: StdioCollector {
             waitForEnd: true
             onStreamFinished: {
-                root.isLoadingRedis = false
+                root.isLoadingReddit = false
                 var raw = text.trim()
                 if (raw.length > 0) {
                     try {
                         var parsed = JSON.parse(raw)
                         if (parsed.error) {
-                            console.warn("NewsService (redis error):", parsed.error)
-                            root.redisFailed = true
+                            console.warn("NewsService (reddit error):", parsed.error)
+                            root.redditFailed = true
                         } else {
-                            root.redisFeed = parsed
+                            root.redditFeed = parsed
                         }
                     } catch (e) {
-                        console.error("NewsService: Failed to parse redis JSON", e)
-                        root.redisFailed = true
+                        console.error("NewsService: Failed to parse reddit JSON", e)
+                        root.redditFailed = true
                     }
                 } else {
-                    root.redisFailed = true
+                    root.redditFailed = true
                 }
             }
         }

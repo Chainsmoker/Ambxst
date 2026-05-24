@@ -5,28 +5,78 @@ import json
 import time
 import urllib.request
 import urllib.error
-import hashlib
 import colorsys
+import hashlib
 
 # Setup Cache Directory
 CACHE_DIR = os.path.expanduser(os.environ.get("XDG_CACHE_HOME", "~/.cache"))
 AMBXST_CACHE_DIR = os.path.join(CACHE_DIR, "ambxst")
 os.makedirs(AMBXST_CACHE_DIR, exist_ok=True)
+IMAGES_DIR = os.path.join(AMBXST_CACHE_DIR, "images")
+os.makedirs(IMAGES_DIR, exist_ok=True)
+
+def download_image(url):
+    """Download image to local cache and return local file:// path to prevent Qt SSL issues."""
+    if not url or not url.startswith("http"):
+        return ""
+    try:
+        url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
+        
+        # Determine extension
+        ext = ".jpg"
+        if ".png" in url.lower():
+            ext = ".png"
+        elif ".webp" in url.lower():
+            ext = ".webp"
+        elif ".gif" in url.lower():
+            ext = ".gif"
+            
+        local_filename = f"{url_hash}{ext}"
+        local_path = os.path.join(IMAGES_DIR, local_filename)
+        
+        if not os.path.exists(local_path):
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": USER_AGENT}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                with open(local_path, "wb") as f:
+                    f.write(response.read())
+                    
+        return f"file://{local_path}"
+    except Exception as e:
+        print(f"Warning: Failed to download image {url}: {e}", file=sys.stderr)
+        return url
+
+def download_header_image():
+    """Ensure the header background image is cached locally."""
+    url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80"
+    local_path = os.path.join(IMAGES_DIR, "header_bg.jpg")
+    if not os.path.exists(local_path):
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": USER_AGENT}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                with open(local_path, "wb") as f:
+                    f.write(response.read())
+        except Exception as e:
+            print(f"Warning: Failed to download header bg: {e}", file=sys.stderr)
 
 # Cache Expiry configuration (in seconds)
 CACHE_EXPIRY = {
-    "news": 900,    # 15 minutes
-    "cve": 1800,    # 30 minutes
-    "redis": 3600   # 1 hour
+    "news": 900,      # 15 minutes
+    "cve": 1800,      # 30 minutes
+    "reddit": 1800    # 30 minutes
 }
 
-# User-Agent to prevent getting blocked by APIs
+# User-Agent to prevent getting blocked by APIs (highly important for Reddit)
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 def get_tag_color(tag):
     """Generate a deterministic, beautiful pastel color based on the tag string."""
     h = sum(ord(c) for c in tag) % 360
-    # Use standard HSL to RGB conversion for a vibrant but soft pastel color
     r, g, b = colorsys.hls_to_rgb(h / 360.0, 0.65, 0.75)
     return '#{:02x}{:02x}{:02x}'.format(int(r*255), int(g*255), int(b*255))
 
@@ -36,14 +86,12 @@ def fetch_json(url):
         url,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
     )
-    with urllib.request.urlopen(req, timeout=8) as response:
+    with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read().decode('utf-8'))
 
 def parse_relative_time(published_at):
     """Convert ISO timestamp or string into a friendly relative time (e.g. '2h ago')."""
     try:
-        # Standard isoformat parsing (compatible with older Python versions)
-        # published_at e.g. "2026-05-24T12:00:00Z"
         clean_time = published_at.replace("Z", "+00:00")
         import datetime
         pub_dt = datetime.datetime.fromisoformat(clean_time)
@@ -71,22 +119,23 @@ def get_tech_news():
     
     formatted = []
     for item in raw_data:
-        # Resolve tag and color
         tags = item.get("tag_list", [])
         tag = tags[0].capitalize() if tags else "Tech"
         
-        # Calculate human-readable source/time
         pub_date = item.get("published_at", "")
         rel_time = parse_relative_time(pub_date)
         author = item.get("user", {}).get("name", "Dev.to")
         source_str = f"{author} · {rel_time}"
+        
+        img_url = item.get("cover_image") or item.get("social_image") or ""
+        local_img = download_image(img_url) if img_url else ""
         
         formatted.append({
             "title": item.get("title", ""),
             "source": source_str,
             "tag": tag,
             "tagColor": get_tag_color(tag),
-            "image": item.get("cover_image") or item.get("social_image") or "",
+            "image": local_img,
             "excerpt": item.get("description", "")
         })
     return formatted
@@ -98,7 +147,6 @@ def get_cves():
     
     formatted = []
     for item in raw_data:
-        # Map CVSS score
         score_val = item.get("cvss")
         if score_val is None:
             score_val = 5.0
@@ -108,7 +156,6 @@ def get_cves():
             except ValueError:
                 score_val = 5.0
                 
-        # Severity ranking & color
         if score_val >= 9.0:
             severity = "CRITICAL"
             color = "#E07556"
@@ -134,43 +181,90 @@ def get_cves():
         })
     return formatted
 
-def get_redis_news():
-    """Fetch Redis articles from Dev.to API."""
-    url = "https://dev.to/api/articles?tag=redis&per_page=12"
+def get_reddit_posts():
+    """Fetch latest tech posts from r/technology on Reddit."""
+    url = "https://www.reddit.com/r/technology/new.json?limit=15"
     raw_data = fetch_json(url)
     
     formatted = []
-    for item in raw_data:
-        # Resolve tag and color
-        tags = item.get("tag_list", [])
-        tag = tags[0].upper() if tags else "REDIS"
+    posts = raw_data.get("data", {}).get("children", [])
+    for post in posts:
+        data = post.get("data", {})
         
-        # Calculate human-readable source/time
-        pub_date = item.get("published_at", "")
-        rel_time = parse_relative_time(pub_date)
-        author = item.get("user", {}).get("name", "Redis Dev")
-        source_str = f"{author} · {rel_time}"
+        if data.get("stickied"):
+            continue
+            
+        title = data.get("title", "")
+        author = data.get("author", "Reddit")
+        subreddit = data.get("subreddit_name_prefixed", "r/technology")
+        
+        created_utc = data.get("created_utc", time.time())
+        import datetime
+        pub_dt = datetime.datetime.fromtimestamp(created_utc, datetime.timezone.utc)
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
+        diff = now_dt - pub_dt
+        seconds = diff.total_seconds()
+        
+        if seconds < 60:
+            rel_time = "just now"
+        elif seconds < 3600:
+            rel_time = f"{int(seconds / 60)}m ago"
+        elif seconds < 86400:
+            rel_time = f"{int(seconds / 3600)}h ago"
+        else:
+            rel_time = f"{int(seconds / 86400)}d ago"
+            
+        source_str = f"{subreddit} · u/{author} · {rel_time}"
+        
+        # Extract premium preview image
+        image_url = ""
+        preview = data.get("preview")
+        if preview and "images" in preview:
+            images = preview["images"]
+            if images:
+                source_img = images[0].get("source", {})
+                image_url = source_img.get("url", "")
+                image_url = image_url.replace("&amp;", "&")
+                
+        if not image_url:
+            thumbnail = data.get("thumbnail", "")
+            if thumbnail.startswith("http"):
+                image_url = thumbnail
+                
+        local_img = download_image(image_url) if image_url else ""
+        
+        excerpt = data.get("selftext", "")
+        if not excerpt:
+            domain = data.get("domain", "")
+            excerpt = f"Link: {domain} — Shared on r/technology."
+        elif len(excerpt) > 180:
+            excerpt = excerpt[:180] + "..."
+            
+        tag = "Reddit"
         
         formatted.append({
-            "title": item.get("title", ""),
+            "title": title,
             "source": source_str,
             "tag": tag,
-            "tagColor": "#e05638" if tag == "REDIS" else get_tag_color(tag),
-            "image": item.get("cover_image") or item.get("social_image") or "",
-            "excerpt": item.get("description", "")
+            "tagColor": "#ff4500",  # Reddit Orange
+            "image": local_img,
+            "excerpt": excerpt
         })
     return formatted
 
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "Missing mode argument. Choose 'news', 'cve', or 'redis'."}))
+        print(json.dumps({"error": "Missing mode argument. Choose 'news', 'cve', or 'reddit'."}))
         sys.exit(1)
         
     mode = sys.argv[1].lower()
     if mode not in CACHE_EXPIRY:
-        print(json.dumps({"error": f"Invalid mode '{mode}'. Choose 'news', 'cve', or 'redis'."}))
+        print(json.dumps({"error": f"Invalid mode '{mode}'. Choose 'news', 'cve', or 'reddit'."}))
         sys.exit(1)
         
+    # Always ensure header image is downloaded
+    download_header_image()
+    
     cache_file = os.path.join(AMBXST_CACHE_DIR, f"news_cache_{mode}.json")
     
     # Check cache validity
@@ -186,7 +280,7 @@ def main():
                 print(f.read())
                 sys.exit(0)
         except Exception:
-            pass  # Fallback to fetching if cache reading fails
+            pass
             
     # Cache is invalid or missing, fetch fresh data
     try:
@@ -194,12 +288,11 @@ def main():
             data = get_tech_news()
         elif mode == "cve":
             data = get_cves()
-        elif mode == "redis":
-            data = get_redis_news()
+        elif mode == "reddit":
+            data = get_reddit_posts()
         else:
             data = []
             
-        # Save to cache
         try:
             with open(cache_file, "w") as f:
                 json.dump(data, f, indent=2)
@@ -209,7 +302,6 @@ def main():
         print(json.dumps(data))
         
     except Exception as e:
-        # In case of network errors or api block, fallback to old cache if available
         if os.path.exists(cache_file):
             try:
                 with open(cache_file, "r") as f:
@@ -219,7 +311,6 @@ def main():
             except Exception:
                 pass
                 
-        # If no cache exists, return an error message nicely in JSON
         print(json.dumps({"error": f"Failed to fetch data: {str(e)}"}))
         sys.exit(1)
 

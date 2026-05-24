@@ -120,6 +120,7 @@ QtObject {
     readonly property string repeatOnce: ""
     readonly property string player: ""
     readonly property string spotify: "<font face='Symbols Nerd Font Mono'>󰓇</font>"
+    readonly property string reddit: "<font face='Symbols Nerd Font Mono'>\uf1a1</font>"
     readonly property string firefox: "<font face='Symbols Nerd Font Mono'>󰈹</font>"
     readonly property string chromium: "<font face='Symbols Nerd Font Mono'></font>"
     readonly property string telegram: "<font face='Symbols Nerd Font Mono'></font>"

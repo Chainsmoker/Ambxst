@@ -38,7 +38,7 @@ PanelWindow {
     readonly property int headerHeight: 160
     readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
 
-    // Tab activa: 0=Tech News, 1=CVEs, 2=Redis
+    // Tab activa: 0=Tech News, 1=CVEs, 2=Reddit
     property int currentTab: 0
 
     // Accent dinámico por tab — define el color del border + active pill
@@ -46,7 +46,7 @@ PanelWindow {
         switch (currentTab) {
             case 0: return Colors.primary;        // tech news: matugen primary
             case 1: return "#E07556";             // CVEs: Alert orange/tomato
-            case 2: return "#E05638";             // Redis: Red
+            case 2: return "#FF4500";             // Reddit: Orange
         }
         return Colors.primary;
     }
@@ -189,7 +189,7 @@ PanelWindow {
             // Dynamic header background image
             Image {
                 anchors.fill: parent
-                source: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80"
+                source: "file://" + Quickshell.env("HOME") + "/.cache/ambxst/images/header_bg.jpg"
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 opacity: 0.45
@@ -364,9 +364,9 @@ PanelWindow {
 
             Repeater {
                 model: [
-                    { ico: Icons.globe, name: "Tech" },
-                    { ico: Icons.shield, name: "CVEs" },
-                    { ico: Icons.cube, name: "Redis" }
+                    { ico: Icons.globe },
+                    { ico: Icons.shield },
+                    { ico: Icons.reddit }
                 ]
 
                 Rectangle {
@@ -375,7 +375,7 @@ PanelWindow {
                     required property int index
                     readonly property bool isActive: dock.currentTab === index
 
-                    width: 120
+                    width: 64
                     height: 40
                     radius: 12
                     color: isActive
@@ -386,24 +386,13 @@ PanelWindow {
                     Behavior on color { ColorAnimation { duration: 220 } }
                     Behavior on border.color { ColorAnimation { duration: 220 } }
 
-                    RowLayout {
+                    Text {
                         anchors.centerIn: parent
-                        spacing: 8
-
-                        Text {
-                            text: pill.modelData.ico
-                            font.family: Icons.font
-                            font.pixelSize: 16
-                            color: "white"
-                        }
-
-                        Text {
-                            text: pill.modelData.name
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(0)
-                            font.weight: Font.Medium
-                            color: "white"
-                        }
+                        text: pill.modelData.ico
+                        textFormat: Text.RichText
+                        font.family: Icons.font
+                        font.pixelSize: 18
+                        color: "white"
                     }
 
                     MouseArea {
@@ -612,23 +601,23 @@ PanelWindow {
                         }
                     }
 
-                    // Tab 2: Redis Updates
+                    // Tab 2: Reddit Updates
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 12
 
                         Loader {
                             Layout.fillWidth: true
-                            active: NewsService.isLoadingRedis || NewsService.redisFailed || NewsService.redisFeed.length === 0
+                            active: NewsService.isLoadingReddit || NewsService.redditFailed || NewsService.redditFeed.length === 0
                             sourceComponent: listStatusView
                             
-                            property bool isLoading: NewsService.isLoadingRedis
-                            property string statusText: NewsService.isLoadingRedis ? "Fetching Redis news..." : (NewsService.redisFailed ? "Failed to retrieve Redis updates." : "No updates available.")
-                            function onRetry() { NewsService.updateRedis() }
+                            property bool isLoading: NewsService.isLoadingReddit
+                            property string statusText: NewsService.isLoadingReddit ? "Fetching Reddit posts..." : (NewsService.redditFailed ? "Failed to retrieve Reddit feed." : "No posts available.")
+                            function onRetry() { NewsService.updateReddit() }
                         }
 
                         Repeater {
-                            model: (!NewsService.isLoadingRedis && !NewsService.redisFailed) ? NewsService.redisFeed : []
+                            model: (!NewsService.isLoadingReddit && !NewsService.redditFailed) ? NewsService.redditFeed : []
                             delegate: newsCardDelegate
                         }
                     }
@@ -695,7 +684,7 @@ PanelWindow {
                     Rectangle {
                         id: fallbackBg
                         anchors.fill: parent
-                        visible: !thumbImage.visible
+                        visible: !thumbImage.visible || thumbImage.status !== Image.Ready
                         gradient: Gradient {
                             GradientStop { position: 0.0; color: cardRect.modelData.tagColor }
                             GradientStop { position: 1.0; color: Qt.darker(cardRect.modelData.tagColor, 1.8) }
@@ -726,7 +715,9 @@ PanelWindow {
                         id: thumbImage
                         anchors.fill: parent
                         source: cardRect.modelData.image || ""
-                        visible: cardRect.modelData.image !== "" && status === Image.Ready
+                        visible: cardRect.modelData.image !== ""
+                        opacity: status === Image.Ready ? 1.0 : 0.0
+                        Behavior on opacity { NumberAnimation { duration: 200 } }
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
