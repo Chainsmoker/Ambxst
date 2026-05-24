@@ -64,8 +64,14 @@ PanelWindow {
 
     implicitWidth: dockWidth + 32
 
-    // Patrón mask: cerrado → hoverStrip, abierto → fullMask.
-    mask: Region { item: dock.isOpen ? fullMask : hoverStrip }
+    // Patrón mask: cerrado → hoverStrip, abierto → fullMask con hombros de unión.
+    mask: Region {
+        regions: [
+            Region { item: dock.isOpen ? fullMask : hoverStrip },
+            Region { item: (dock.isOpen && dock.barAtTop) ? topRightShoulder : null },
+            Region { item: (dock.isOpen && !dock.barAtTop) ? bottomRightShoulder : null }
+        ]
+    }
     Item {
         id: fullMask
         x: 0
@@ -304,6 +310,24 @@ PanelWindow {
             }
         }
 
+        // Hombro cóncavo top-right del dock body (solo si bar está arriba).
+        Item {
+            id: topRightShoulder
+            width: dock.shoulderSize
+            height: dock.shoulderSize
+            anchors.top: dockBg.top
+            anchors.left: dockBg.right
+            visible: dock.barAtTop
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: RoundCorner.CornerEnum.TopLeft
+                size: dock.shoulderSize
+                color: dockBg.color
+                Behavior on color { ColorAnimation { duration: 700 } }
+            }
+        }
+
         // Hombro cóncavo bottom-right del dock body (solo si bar está abajo).
         Item {
             id: bottomRightShoulder
@@ -315,7 +339,7 @@ PanelWindow {
 
             RoundCorner {
                 anchors.fill: parent
-                corner: RoundCorner.CornerEnum.TopLeft
+                corner: RoundCorner.CornerEnum.BottomLeft
                 size: dock.shoulderSize
                 color: dockBg.color
                 Behavior on color { ColorAnimation { duration: 700 } }
