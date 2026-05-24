@@ -246,6 +246,55 @@ Item {
             }
         }
 
+        // Pinta el lado derecho del bar con el color "bg" cuando el RightDock está abierto,
+        // para que bar y dock se vean como una sola superficie continua.
+        // Sólo aplica en bars horizontales (top/bottom).
+        StyledRect {
+            id: rightDockAccent
+            // Bar paint cubre el ancho del dock body. El tab rail vertical
+            // fue eliminado, así que volvemos a 380px puro.
+            readonly property int dockWidth: 420
+            readonly property int shoulderSize: 18  // debe coincidir con RightDock.qml:shoulderSize
+            visible: opacity > 0.001
+            opacity: (root.orientation === "horizontal" && GlobalStates.rightDockOpen) ? 1 : 0
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: dockWidth
+            variant: "bg"
+            enableShadow: false
+            enableBorder: false
+            radius: 0
+            animateRadius: false
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: (Config.animDuration !== undefined ? Config.animDuration : 0) > 0
+                              ? Config.animDuration
+                              : 220
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        // Hombro cóncavo en el top-left de la franja del bar: extiende el bg hacia la izquierda
+        // con una curva tipo notch, simétrica con el hombro inferior del dock.
+        Item {
+            id: topLeftShoulder
+            width: rightDockAccent.shoulderSize
+            height: rightDockAccent.shoulderSize
+            anchors.top: rightDockAccent.top
+            anchors.right: rightDockAccent.left
+            visible: rightDockAccent.visible
+            opacity: rightDockAccent.opacity
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: RoundCorner.CornerEnum.BottomRight
+                size: rightDockAccent.shoulderSize
+                color: rightDockAccent.color
+            }
+        }
+
         // Bar content inside MouseArea (clicks pass through to children)
         Item {
             id: bar

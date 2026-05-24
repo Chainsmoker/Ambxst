@@ -33,7 +33,7 @@ PanelWindow {
     // CRÍTICO: ocultar PanelWindow cuando cerrado para no bloquear clicks del sistema.
     visible: isOpen || dockContainer.opacity > 0.001
 
-    readonly property int dockWidth: 380
+    readonly property int dockWidth: 420
     readonly property int hPadding: 12
     readonly property int vPadding: 0          // header come hasta el borde
     readonly property int headerHeight: 150
@@ -44,20 +44,6 @@ PanelWindow {
     // Tab activa: 0=Calendar, 1=Weather, 2=Pomodoro, 3=ColorPicker
     property int currentTab: 0
     readonly property int tabBarHeight: 64  // altura reservada arriba para las pills floating
-
-    readonly property bool barAtTop: {
-        const pos = Config.bar?.position ?? "top";
-        return pos === "top";
-    }
-
-    readonly property int activeContentHeight: {
-        var item = contentStack.children[currentTab];
-        if (!item) return 400;
-        return item.implicitHeight > 0 ? item.implicitHeight : (item.Layout?.preferredHeight ?? 400);
-    }
-
-    readonly property int targetDockHeight: headerHeight + activeContentHeight + sectionSpacing + 24
-    readonly property int dynamicHeight: Math.min(targetDockHeight, dock.height - barReserved - 24)
 
     // Accent dinámico por tab — define el color del border + active pill
     readonly property color tabAccent: {
@@ -84,9 +70,9 @@ PanelWindow {
     Item {
         id: fullMask
         x: dock.width - dock.dockWidth
-        y: barAtTop ? dock.barReserved : (dock.height - dockBg.height)
+        y: dock.barReserved
         width: dock.dockWidth
-        height: dockBg.height
+        height: dock.height - dock.barReserved
     }
     Item { id: emptyMask; width: 0; height: 0 }
 
@@ -105,12 +91,11 @@ PanelWindow {
 
         transform: Translate {
             id: slideTransform
-            y: dock.isOpen ? 0 : (barAtTop ? -dockBg.height - 50 : dockBg.height + 50)
-            Behavior on y {
+            x: dock.isOpen ? 0 : dock.dockContainerWidth
+            Behavior on x {
                 NumberAnimation {
-                    duration: Config.animDuration > 0 ? Config.animDuration : 250
-                    easing.type: dock.isOpen ? Easing.OutBack : Easing.InCubic
-                    easing.overshoot: dock.isOpen ? 1.05 : 1.0
+                    duration: Config.animDuration > 0 ? Config.animDuration : 220
+                    easing.type: dock.isOpen ? Easing.OutCubic : Easing.InCubic
                 }
             }
         }
@@ -126,25 +111,17 @@ PanelWindow {
         StyledRect {
             id: dockBg
             anchors.right: parent.right
-            anchors.top: barAtTop ? parent.top : undefined
-            anchors.bottom: barAtTop ? undefined : parent.bottom
-            height: dock.dynamicHeight
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
             width: dock.dockWidth
             variant: "bg"
             enableShadow: true
             radius: 0
-            topLeftRadius: barAtTop ? 0 : Styling.radius(16)
-            topRightRadius: barAtTop ? 0 : Styling.radius(16)
-            bottomLeftRadius: barAtTop ? Styling.radius(16) : 0
-            bottomRightRadius: barAtTop ? Styling.radius(16) : 0
+            topLeftRadius: 0
+            bottomLeftRadius: 0
+            topRightRadius: 0
+            bottomRightRadius: 0
             clip: true
-
-            Behavior on height {
-                NumberAnimation {
-                    duration: 250
-                    easing.type: Easing.OutCubic
-                }
-            }
         }
 
         // Header fijo (wallpaper + distro logo) arriba del dock — vive
@@ -183,7 +160,6 @@ PanelWindow {
             height: dock.shoulderSize
             anchors.bottom: dockBg.bottom
             anchors.right: dockBg.left
-            visible: !barAtTop
 
             RoundCorner {
                 anchors.fill: parent
@@ -271,7 +247,7 @@ PanelWindow {
             id: scroller
             anchors.right: parent.right
             anchors.top: dockHeader.bottom  // empieza debajo del DistroHeader fijo
-            anchors.bottom: dockBg.bottom
+            anchors.bottom: parent.bottom
             width: dock.dockWidth
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
