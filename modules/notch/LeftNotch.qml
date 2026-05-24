@@ -15,13 +15,9 @@ Item {
 
     required property ShellScreen screen
     property bool unifiedEffectActive: false
+    readonly property Item hitbox: hoverArea
 
-    readonly property bool activeWindowFullscreen: {
-        const toplevel = ToplevelManager.activeToplevel;
-        if (!toplevel || !toplevel.activated)
-            return false;
-        return toplevel.fullscreen === true;
-    }
+    readonly property bool activeWindowFullscreen: ToplevelManager.activeToplevel ? (ToplevelManager.activeToplevel.activated && ToplevelManager.activeToplevel.fullscreen === true) : false
 
     // Disable the hover trigger in fullscreen unless the bar is configured to show in fullscreen
     readonly property bool enabled: !activeWindowFullscreen || (Config.bar && Config.bar.availableOnFullscreen === true)
@@ -35,10 +31,10 @@ Item {
     MouseArea {
         id: hoverArea
         hoverEnabled: true
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
         x: 0
         width: root.reveal ? (root.pillSize + 16) : 10
-        height: root.pillSize + 24
 
         Behavior on width {
             enabled: Config.animDuration > 0
