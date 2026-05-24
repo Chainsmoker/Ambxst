@@ -41,6 +41,12 @@ PanelWindow {
     // Tab activa: 0=Tech News, 1=CVEs, 2=Reddit
     property int currentTab: 0
 
+    onCurrentTabChanged: {
+        if (scroller.contentItem) {
+            scroller.contentItem.contentY = 0
+        }
+    }
+
     // Accent dinámico por tab — define el color del border + active pill
     readonly property color tabAccent: {
         switch (currentTab) {
@@ -411,21 +417,30 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: tabPills.bottom
-            anchors.topMargin: 16
+            anchors.topMargin: 4
             anchors.bottom: parent.bottom
             width: dock.dockWidth
             clip: true
+            bottomPadding: 24
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-            ColumnLayout {
-                width: scroller.width - 24
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: dock.sectionSpacing
+            WheelHandler {
+                target: scroller.contentItem
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: (event) => {
+                    var flick = scroller.contentItem;
+                    var scrollStep = event.angleDelta.y * 1.8;
+                    flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, flick.contentY - scrollStep));
+                    event.accepted = true;
+                }
+            }
 
-                StackLayout {
-                    id: contentStack
-                    Layout.fillWidth: true
-                    currentIndex: dock.currentTab
+            StackLayout {
+                id: contentStack
+                x: 12
+                width: scroller.width - 24
+                implicitHeight: (contentStack.currentIndex >= 0 && contentStack.children[contentStack.currentIndex]) ? contentStack.children[contentStack.currentIndex].implicitHeight : 0
+                currentIndex: dock.currentTab
 
                     // Tab 0: Tech News
                     ColumnLayout {
@@ -435,6 +450,7 @@ PanelWindow {
                         Loader {
                             Layout.fillWidth: true
                             active: NewsService.isLoadingNews || NewsService.newsFailed || NewsService.techNews.length === 0
+                            visible: active
                             sourceComponent: listStatusView
                             
                             property bool isLoading: NewsService.isLoadingNews
@@ -456,6 +472,7 @@ PanelWindow {
                         Loader {
                             Layout.fillWidth: true
                             active: NewsService.isLoadingCve || NewsService.cveFailed || NewsService.cveFeed.length === 0
+                            visible: active
                             sourceComponent: listStatusView
                             
                             property bool isLoading: NewsService.isLoadingCve
@@ -603,6 +620,7 @@ PanelWindow {
                         Loader {
                             Layout.fillWidth: true
                             active: NewsService.isLoadingReddit || NewsService.redditFailed || NewsService.redditFeed.length === 0
+                            visible: active
                             sourceComponent: listStatusView
                             
                             property bool isLoading: NewsService.isLoadingReddit
@@ -618,7 +636,6 @@ PanelWindow {
                 }
             }
         }
-    }
 
     Component {
         id: newsCardDelegate
