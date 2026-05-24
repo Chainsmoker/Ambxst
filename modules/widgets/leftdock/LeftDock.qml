@@ -38,7 +38,7 @@ PanelWindow {
     readonly property int headerHeight: 160
     readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
 
-    // Tab activa: 0=Tech News, 1=CVEs
+    // Tab activa: 0=Tech News, 1=CVEs, 2=Redis
     property int currentTab: 0
 
     // Accent dinámico por tab — define el color del border + active pill
@@ -46,6 +46,7 @@ PanelWindow {
         switch (currentTab) {
             case 0: return Colors.primary;        // tech news: matugen primary
             case 1: return "#E07556";             // CVEs: Alert orange/tomato
+            case 2: return "#E05638";             // Redis: Red
         }
         return Colors.primary;
     }
@@ -117,73 +118,7 @@ PanelWindow {
 
     readonly property int dockContainerWidth: dock.dockWidth
 
-    // Mock Data for Tech News with images and fallbacks
-    readonly property var techNews: [
-        {
-            title: "Google's Gemini 2.0 Ultra revolutionizes autonomous agent coding",
-            source: "Hacker News · 2h ago",
-            tag: "AI",
-            tagColor: "#5dadeb",
-            image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
-            excerpt: "The new autonomous agent architecture solves complex software development tasks with expert-level sequential reasoning."
-        },
-        {
-            title: "Linux Kernel 6.15 introduces scheduler optimizations for AMD Zen 5 CPUs",
-            source: "Phoronix · 4h ago",
-            tag: "Kernel",
-            tagColor: "#E07556",
-            image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&auto=format&fit=crop&q=80",
-            excerpt: "The improvements reduce thread latency and boost compilation performance by up to 12% on next-gen processors."
-        },
-        {
-            title: "Hyprland releases v0.48 with experimental hardware sync support",
-            source: "GitHub Changelog · 1d ago",
-            tag: "Wayland",
-            tagColor: "#9fd0ec",
-            image: "", // Will trigger abstract fallback design
-            excerpt: "The new release significantly reduces GPU power usage by directly synchronizing display rendering buffers."
-        },
-        {
-            title: "Rust consolidates its adoption in critical system security components",
-            source: "Tech Crunch · 1d ago",
-            tag: "Security",
-            tagColor: "#7a4a8a",
-            image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&auto=format&fit=crop&q=80",
-            excerpt: "Several major Linux distributions announce plans to migrate critical submodules to libraries natively written in Rust."
-        }
-    ]
-
-    // Mock Data for CVEs
-    readonly property var cveFeed: [
-        {
-            cve: "CVE-2026-12345",
-            severity: "CRITICAL",
-            score: "9.8",
-            color: "#E07556",
-            description: "Remote Code Execution (RCE) vulnerability in the Linux kernel XFRM subsystem. Allows unauthenticated attackers to bypass IPsec protections."
-        },
-        {
-            cve: "CVE-2026-98765",
-            severity: "HIGH",
-            score: "8.2",
-            color: "#ff8a4a",
-            description: "Buffer overflow in the OpenSSH daemon when processing custom authentication packets through specific PAM modules."
-        },
-        {
-            cve: "CVE-2026-45678",
-            severity: "MEDIUM",
-            score: "6.5",
-            color: "#ffe57a",
-            description: "Denial of Service (DoS) in the Hyprland compositor. Malicious IPC packets can trigger an infinite loop in the event dispatcher."
-        },
-        {
-            cve: "CVE-2026-11111",
-            severity: "LOW",
-            score: "3.1",
-            color: "#7f8fa6",
-            description: "Information disclosure due to insufficient permissions on the local UNIX communication socket of axctl. Local users can read basic metadata."
-        }
-    ]
+    // Live feeds are managed and loaded via NewsService
 
     Item {
         id: dockContainer
@@ -429,8 +364,9 @@ PanelWindow {
 
             Repeater {
                 model: [
-                    { ico: Icons.globe, name: "Tech News" },
-                    { ico: Icons.shield, name: "Latest CVEs" }
+                    { ico: Icons.globe, name: "Tech" },
+                    { ico: Icons.shield, name: "CVEs" },
+                    { ico: Icons.cube, name: "Redis" }
                 ]
 
                 Rectangle {
@@ -439,7 +375,7 @@ PanelWindow {
                     required property int index
                     readonly property bool isActive: dock.currentTab === index
 
-                    width: 170
+                    width: 120
                     height: 40
                     radius: 12
                     color: isActive
@@ -502,189 +438,44 @@ PanelWindow {
                     Layout.fillWidth: true
                     currentIndex: dock.currentTab
 
+                    // Tab 0: Tech News
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 12
 
+                        Loader {
+                            Layout.fillWidth: true
+                            active: NewsService.isLoadingNews || NewsService.newsFailed || NewsService.techNews.length === 0
+                            sourceComponent: listStatusView
+                            
+                            property bool isLoading: NewsService.isLoadingNews
+                            property string statusText: NewsService.isLoadingNews ? "Fetching latest news..." : (NewsService.newsFailed ? "Failed to retrieve news feed." : "No articles available.")
+                            function onRetry() { NewsService.updateNews() }
+                        }
+
                         Repeater {
-                            model: dock.techNews
-
-                            delegate: StyledRect {
-                                id: cardRect
-                                required property var modelData
-                                required property int index
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: contentColumn.implicitHeight + 16
-                                variant: "internalbg"
-                                radius: 16
-                                enableShadow: false
-
-                                property bool isHovered: false
-                                scale: isHovered ? 1.02 : 1.0
-                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
-
-                                HoverHandler {
-                                    onHoveredChanged: cardRect.isHovered = hovered
-                                }
-
-                                ColumnLayout {
-                                    id: contentColumn
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    spacing: 0
-
-                                    // Top Section: Image or Fallback
-                                    Item {
-                                        id: imageArea
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 180
-                                        clip: true
-
-                                        layer.enabled: true
-                                        layer.effect: MultiEffect {
-                                            maskEnabled: true
-                                            maskSource: imageMaskShape
-                                        }
-
-                                        Item {
-                                            id: imageMaskShape
-                                            anchors.fill: parent
-                                            visible: false
-                                            Rectangle {
-                                                anchors.fill: parent
-                                                topLeftRadius: 16
-                                                topRightRadius: 16
-                                                bottomLeftRadius: 0
-                                                bottomRightRadius: 0
-                                                color: "black"
-                                            }
-                                        }
-
-                                        // Fallback Bg
-                                        Rectangle {
-                                            id: fallbackBg
-                                            anchors.fill: parent
-                                            visible: !thumbImage.visible
-                                            gradient: Gradient {
-                                                GradientStop { position: 0.0; color: cardRect.modelData.tagColor }
-                                                GradientStop { position: 1.0; color: Qt.darker(cardRect.modelData.tagColor, 1.8) }
-                                            }
-
-                                            Rectangle {
-                                                width: 120
-                                                height: 120
-                                                radius: 60
-                                                color: Qt.rgba(1, 1, 1, 0.1)
-                                                x: parent.width - 60
-                                                y: -30
-                                            }
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: cardRect.modelData.tag
-                                                color: Qt.rgba(1, 1, 1, 0.9)
-                                                font.family: Config.theme.font
-                                                font.pixelSize: 36
-                                                font.weight: Font.Bold
-                                                font.letterSpacing: 2
-                                            }
-                                        }
-
-                                        // Actual Image
-                                        Image {
-                                            id: thumbImage
-                                            anchors.fill: parent
-                                            source: cardRect.modelData.image || ""
-                                            visible: cardRect.modelData.image !== "" && status === Image.Ready
-                                            fillMode: Image.PreserveAspectCrop
-                                            asynchronous: true
-                                            cache: true
-
-                                            scale: cardRect.isHovered ? 1.05 : 1.0
-                                            Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
-                                        }
-
-                                        // Floating tag badge
-                                        Rectangle {
-                                            anchors.left: parent.left
-                                            anchors.top: parent.top
-                                            anchors.margins: 12
-                                            height: 24
-                                            width: tagText.implicitWidth + 16
-                                            radius: 12
-                                            color: Qt.rgba(0, 0, 0, 0.6)
-                                            border.color: Qt.rgba(1, 1, 1, 0.2)
-                                            border.width: 1
-
-                                            RowLayout {
-                                                anchors.centerIn: parent
-                                                spacing: 4
-                                                Rectangle {
-                                                    width: 6
-                                                    height: 6
-                                                    radius: 3
-                                                    color: cardRect.modelData.tagColor
-                                                }
-                                                Text {
-                                                    id: tagText
-                                                    text: cardRect.modelData.tag
-                                                    color: "white"
-                                                    font.family: Config.theme.font
-                                                    font.pixelSize: Styling.fontSize(-2)
-                                                    font.weight: Font.Bold
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Bottom Section: Info and Text
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        Layout.margins: 16
-                                        spacing: 8
-
-                                        Text {
-                                            text: cardRect.modelData.source
-                                            color: Colors.outline
-                                            font.family: Config.theme.font
-                                            font.pixelSize: Styling.fontSize(-2)
-                                            opacity: 0.8
-                                        }
-
-                                        Text {
-                                            text: cardRect.modelData.title
-                                            color: Colors.overBackground
-                                            font.family: Config.theme.font
-                                            font.pixelSize: Styling.fontSize(0)
-                                            font.weight: Font.Bold
-                                            Layout.fillWidth: true
-                                            wrapMode: Text.WordWrap
-                                            lineHeight: 1.15
-                                        }
-
-                                        Text {
-                                            text: cardRect.modelData.excerpt
-                                            color: Colors.outline
-                                            font.family: Config.theme.font
-                                            font.pixelSize: Styling.fontSize(-1)
-                                            Layout.fillWidth: true
-                                            wrapMode: Text.WordWrap
-                                            opacity: 0.85
-                                            lineHeight: 1.2
-                                        }
-                                    }
-                                }
-                            }
+                            model: (!NewsService.isLoadingNews && !NewsService.newsFailed) ? NewsService.techNews : []
+                            delegate: newsCardDelegate
                         }
                     }
 
+                    // Tab 1: Latest CVEs
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 12
 
+                        Loader {
+                            Layout.fillWidth: true
+                            active: NewsService.isLoadingCve || NewsService.cveFailed || NewsService.cveFeed.length === 0
+                            sourceComponent: listStatusView
+                            
+                            property bool isLoading: NewsService.isLoadingCve
+                            property string statusText: NewsService.isLoadingCve ? "Scanning vulnerability databases..." : (NewsService.cveFailed ? "Failed to retrieve vulnerabilities." : "No CVE reports available.")
+                            function onRetry() { NewsService.updateCve() }
+                        }
+
                         Repeater {
-                            model: dock.cveFeed
+                            model: (!NewsService.isLoadingCve && !NewsService.cveFailed) ? NewsService.cveFeed : []
 
                             delegate: StyledRect {
                                 id: cveCard
@@ -819,6 +610,274 @@ PanelWindow {
                                 }
                             }
                         }
+                    }
+
+                    // Tab 2: Redis Updates
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        Loader {
+                            Layout.fillWidth: true
+                            active: NewsService.isLoadingRedis || NewsService.redisFailed || NewsService.redisFeed.length === 0
+                            sourceComponent: listStatusView
+                            
+                            property bool isLoading: NewsService.isLoadingRedis
+                            property string statusText: NewsService.isLoadingRedis ? "Fetching Redis news..." : (NewsService.redisFailed ? "Failed to retrieve Redis updates." : "No updates available.")
+                            function onRetry() { NewsService.updateRedis() }
+                        }
+
+                        Repeater {
+                            model: (!NewsService.isLoadingRedis && !NewsService.redisFailed) ? NewsService.redisFeed : []
+                            delegate: newsCardDelegate
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: newsCardDelegate
+        StyledRect {
+            id: cardRect
+            required property var modelData
+            required property int index
+            Layout.fillWidth: true
+            Layout.preferredHeight: contentColumn.implicitHeight + 16
+            variant: "internalbg"
+            radius: 16
+            enableShadow: false
+
+            property bool isHovered: false
+            scale: isHovered ? 1.02 : 1.0
+            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+
+            HoverHandler {
+                onHoveredChanged: cardRect.isHovered = hovered
+            }
+
+            ColumnLayout {
+                id: contentColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                spacing: 0
+
+                // Top Section: Image or Fallback
+                Item {
+                    id: imageArea
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 180
+                    clip: true
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled: true
+                        maskSource: imageMaskShape
+                    }
+
+                    Item {
+                        id: imageMaskShape
+                        anchors.fill: parent
+                        visible: false
+                        Rectangle {
+                            anchors.fill: parent
+                            topLeftRadius: 16
+                            topRightRadius: 16
+                            bottomLeftRadius: 0
+                            bottomRightRadius: 0
+                            color: "black"
+                        }
+                    }
+
+                    // Fallback Bg
+                    Rectangle {
+                        id: fallbackBg
+                        anchors.fill: parent
+                        visible: !thumbImage.visible
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: cardRect.modelData.tagColor }
+                            GradientStop { position: 1.0; color: Qt.darker(cardRect.modelData.tagColor, 1.8) }
+                        }
+
+                        Rectangle {
+                            width: 120
+                            height: 120
+                            radius: 60
+                            color: Qt.rgba(1, 1, 1, 0.1)
+                            x: parent.width - 60
+                            y: -30
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: cardRect.modelData.tag
+                            color: Qt.rgba(1, 1, 1, 0.9)
+                            font.family: Config.theme.font
+                            font.pixelSize: 36
+                            font.weight: Font.Bold
+                            font.letterSpacing: 2
+                        }
+                    }
+
+                    // Actual Image
+                    Image {
+                        id: thumbImage
+                        anchors.fill: parent
+                        source: cardRect.modelData.image || ""
+                        visible: cardRect.modelData.image !== "" && status === Image.Ready
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: true
+
+                        scale: cardRect.isHovered ? 1.05 : 1.0
+                        Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
+                    }
+
+                    // Floating tag badge
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.margins: 12
+                        height: 24
+                        width: tagText.implicitWidth + 16
+                        radius: 12
+                        color: Qt.rgba(0, 0, 0, 0.6)
+                        border.color: Qt.rgba(1, 1, 1, 0.2)
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 4
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: cardRect.modelData.tagColor
+                            }
+                            Text {
+                                id: tagText
+                                text: cardRect.modelData.tag
+                                color: "white"
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-2)
+                                font.weight: Font.Bold
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Section: Info and Text
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.margins: 16
+                    spacing: 8
+
+                    Text {
+                        text: cardRect.modelData.source
+                        color: Colors.outline
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-2)
+                        opacity: 0.8
+                    }
+
+                    Text {
+                        text: cardRect.modelData.title
+                        color: Colors.overBackground
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(0)
+                        font.weight: Font.Bold
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        lineHeight: 1.15
+                    }
+
+                    Text {
+                        text: cardRect.modelData.excerpt
+                        color: Colors.outline
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-1)
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.85
+                        lineHeight: 1.2
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: listStatusView
+        Item {
+            id: statusRoot
+            readonly property string statusText: parent.statusText
+            readonly property bool isLoading: parent.isLoading
+
+            implicitWidth: parent.width
+            implicitHeight: 300
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 16
+                width: parent.width - 32
+
+                Text {
+                    id: iconText
+                    Layout.alignment: Qt.AlignHCenter
+                    text: statusRoot.isLoading ? Icons.circleNotch : Icons.alert
+                    font.family: Icons.font
+                    font.pixelSize: 36
+                    color: dock.tabAccent
+
+                    RotationAnimator {
+                        target: iconText
+                        running: statusRoot.isLoading
+                        loops: Animation.Infinite
+                        from: 0
+                        to: 360
+                        duration: 1200
+                    }
+                }
+
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: statusRoot.statusText
+                    font.family: Config.theme.font
+                    font.pixelSize: Styling.fontSize(0)
+                    color: Colors.outline
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
+                Rectangle {
+                    visible: !statusRoot.isLoading
+                    Layout.alignment: Qt.AlignHCenter
+                    width: 110
+                    height: 36
+                    radius: 12
+                    color: retryMouse.containsMouse ? dock.tabAccent : Qt.rgba(1, 1, 1, 0.1)
+                    border.color: Qt.rgba(1, 1, 1, 0.2)
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Retry"
+                        color: "white"
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-1)
+                        font.weight: Font.Bold
+                    }
+
+                    MouseArea {
+                        id: retryMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: statusRoot.parent.onRetry()
                     }
                 }
             }
