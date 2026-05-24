@@ -276,24 +276,6 @@ Item {
             }
         }
 
-        // Hombro cóncavo en el top-left de la franja del bar: extiende el bg hacia la izquierda
-        // con una curva tipo notch, simétrica con el hombro inferior del dock.
-        Item {
-            id: topLeftShoulder
-            width: rightDockAccent.shoulderSize
-            height: rightDockAccent.shoulderSize
-            anchors.top: rightDockAccent.top
-            anchors.right: rightDockAccent.left
-            visible: rightDockAccent.visible
-            opacity: rightDockAccent.opacity
-
-            RoundCorner {
-                anchors.fill: parent
-                corner: RoundCorner.CornerEnum.BottomRight
-                size: rightDockAccent.shoulderSize
-                color: rightDockAccent.color
-            }
-        }
 
         // Pinta el lado izquierdo del bar con el color "bg" cuando el LeftDock está abierto,
         // para que bar y dock se vean como una sola superficie continua.
@@ -323,24 +305,6 @@ Item {
             }
         }
 
-        // Hombro cóncavo en el top-right de la franja del bar: extiende el bg hacia la derecha
-        // con una curva tipo notch.
-        Item {
-            id: topRightShoulder
-            width: leftDockAccent.shoulderSize
-            height: leftDockAccent.shoulderSize
-            anchors.top: leftDockAccent.top
-            anchors.left: leftDockAccent.right
-            visible: leftDockAccent.visible
-            opacity: leftDockAccent.opacity
-
-            RoundCorner {
-                anchors.fill: parent
-                corner: RoundCorner.CornerEnum.BottomLeft
-                size: leftDockAccent.shoulderSize
-                color: leftDockAccent.color
-            }
-        }
 
         // Bar content inside MouseArea (clicks pass through to children)
         Item {

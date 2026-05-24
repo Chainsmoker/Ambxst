@@ -36,7 +36,7 @@ PanelWindow {
     readonly property int hPadding: 16
     readonly property int sectionSpacing: 12
     readonly property int headerHeight: 110
-    readonly property int shoulderSize: 18
+    readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 20 : 36
 
     // Tab activa: 0=Tech News, 1=CVEs
     property int currentTab: 0
@@ -62,7 +62,7 @@ PanelWindow {
         return Config.bar?.position === "top" ? base : 0;
     }
 
-    implicitWidth: dockWidth + 32
+    implicitWidth: dockWidth + dock.shoulderSize + 8
 
     // Patrón mask: cerrado → hoverStrip, abierto → fullMask con hombros de unión.
     mask: Region {
