@@ -39,6 +39,47 @@ Singleton {
         loadPresetProcess.running = true;
     }
 
+    // Write custom equalizer gains and load preset
+    function applyEqualizer(gains) {
+        let freqs = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+        let leftObj = {};
+        let rightObj = {};
+        for (let i = 0; i < 10; i++) {
+            let gainVal = gains[i];
+            let bandObj = {
+                "frequency": freqs[i],
+                "gain": gainVal,
+                "mode": "RLC (BT)",
+                "mute": false,
+                "q": 1.41,
+                "slope": "x1",
+                "solo": false,
+                "type": "Bell"
+            };
+            leftObj["band" + i] = bandObj;
+            rightObj["band" + i] = bandObj;
+        }
+
+        let preset = {
+            "output": {
+                "blocklist": [],
+                "equalizer": {
+                    "input-gain": 0.0,
+                    "left": leftObj,
+                    "right": rightObj
+                }
+            }
+        };
+
+        root.activeOutputPreset = "ambxst_eq";
+        writePresetProcess.command = [
+            "bash", "-c", 
+            "mkdir -p ~/.config/easyeffects/output && echo '" + JSON.stringify(preset) + "' > ~/.config/easyeffects/output/ambxst_eq.json && easyeffects -l ambxst_eq"
+        ];
+        writePresetProcess.running = true;
+    }
+
+
     function loadInputPreset(name: string) {
         root.activeInputPreset = name;  // Optimistic
         loadPresetProcess.command = ["easyeffects", "-l", name];
@@ -116,6 +157,12 @@ Singleton {
             // Delay for preset application
             refreshDelayTimer.restart();
         }
+    }
+
+    // Write custom preset
+    Process {
+        id: writePresetProcess
+        running: false
     }
 
     // Refresh delay after preset load
