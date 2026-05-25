@@ -90,6 +90,11 @@ PanelWindow {
             name: "screen",
             icon: Icons.fullScreenshot,
             tooltip: "Screen"
+        },
+        {
+            name: "region-edit",
+            icon: Icons.edit,
+            tooltip: "Region + Editor"
         }
     ]
 
@@ -99,8 +104,9 @@ PanelWindow {
         GlobalStates.screenshotCaptureMode = "region";
 
         screenshotPopup.state = "loading";
-        
-        // Trigger freeze (Service will batch it for all monitors)
+
+        // Congelar de inmediato (el notch/tools-menu se queda como esté; si no lo
+        // quieres en la captura, usa el atajo en vez del header).
         Screenshot.freezeScreen();
     }
 
@@ -114,8 +120,9 @@ PanelWindow {
             // Fullscreen capture for THIS monitor
             Screenshot.processMonitorScreen(screenshotPopup.targetScreen.name);
             close();
-        } else if (screenshotPopup.currentMode === "region") {
+        } else if (screenshotPopup.currentMode === "region" || screenshotPopup.currentMode === "region-edit") {
             if (Screenshot.selectionW > 0) {
+                Screenshot.captureMode = (screenshotPopup.currentMode === "region-edit") ? "edit" : "normal";
                 Screenshot.processRegion(Screenshot.selectionX, Screenshot.selectionY, Screenshot.selectionW, Screenshot.selectionH);
                 close();
             }
@@ -132,7 +139,7 @@ PanelWindow {
                 previewImage.source = "";
                 previewImage.source = "file://" + path;
                 screenshotPopup.state = "active";
-                
+
                 // Reset selection
                 Screenshot.selectionW = 0;
                 Screenshot.selectionH = 0;
@@ -251,9 +258,9 @@ PanelWindow {
         MouseArea {
             id: regionArea
             anchors.fill: parent
-            enabled: screenshotPopup.state === "active" && (screenshotPopup.currentMode === "region" || screenshotPopup.currentMode === "screen")
+            enabled: screenshotPopup.state === "active" && (screenshotPopup.currentMode === "region" || screenshotPopup.currentMode === "region-edit" || screenshotPopup.currentMode === "screen")
             hoverEnabled: true
-            cursorShape: screenshotPopup.currentMode === "region" ? Qt.CrossCursor : Qt.ArrowCursor
+            cursorShape: (screenshotPopup.currentMode === "region" || screenshotPopup.currentMode === "region-edit") ? Qt.CrossCursor : Qt.ArrowCursor
 
             property point startPointGlobal: Qt.point(0, 0)
             property bool selecting: false
@@ -303,6 +310,7 @@ PanelWindow {
                 selecting = false;
                 
                 if (Screenshot.selectionW > 5 && Screenshot.selectionH > 5) {
+                    Screenshot.captureMode = (screenshotPopup.currentMode === "region-edit") ? "edit" : "normal";
                     Screenshot.processRegion(Screenshot.selectionX, Screenshot.selectionY, Screenshot.selectionW, Screenshot.selectionH);
                     close();
                 }
@@ -312,8 +320,8 @@ PanelWindow {
         // Visual Selection Rect (Synced)
         Rectangle {
             id: selectionRect
-            visible: screenshotPopup.state === "active" && screenshotPopup.currentMode === "region"
-            
+            visible: screenshotPopup.state === "active" && (screenshotPopup.currentMode === "region" || screenshotPopup.currentMode === "region-edit")
+
             // Map global selection to local
             x: Screenshot.selectionX - screenshotPopup.screen.x
             y: Screenshot.selectionY - screenshotPopup.screen.y

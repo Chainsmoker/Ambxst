@@ -18,16 +18,20 @@ PanelWindow {
     screen: targetScreen
 
     property string imagePath: ""
+    // Destino permanente para el botón 💾 (la captura vive en /tmp hasta guardarse)
+    property string savePath: ""
+    // Si está fijado, el preview no se auto-oculta
+    property bool pinned: false
 
-    // Position: Bottom Left with margins
+    // Position: Top Right with margins
     anchors {
-        left: true
-        bottom: true
+        right: true
+        top: true
     }
 
     // Width/Height handled by content + margins
-    implicitWidth: mainRow.width + 20
-    implicitHeight: mainRow.height + 20
+    implicitWidth: mainColumn.width + 20
+    implicitHeight: mainColumn.height + 20
 
     color: "transparent"
     visible: imagePath !== ""
@@ -48,7 +52,7 @@ PanelWindow {
         id: hideTimer
         interval: 5000
         repeat: false
-        running: root.visible && !mouseAreaHover.containsMouse
+        running: root.visible && !mouseAreaHover.containsMouse && !root.pinned
         onTriggered: root.imagePath = ""
     }
 
@@ -72,47 +76,34 @@ PanelWindow {
 
             if (mx >= s.x && mx < (s.x + s.width) && my >= s.y && my < (s.y + s.height)) {
                 root.imagePath = path;
+                root.savePath = Screenshot.pendingSavePath;
             } else if (Screenshot.captureMode === "screen") {
                 var cursor = Quickshell.cursor;
                 if (cursor && cursor.screen && cursor.screen.name === s.name) {
                     root.imagePath = path;
+                    root.savePath = Screenshot.pendingSavePath;
                 }
             }
         }
     }
 
-    Row {
-        id: mainRow
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
+    Column {
+        id: mainColumn
+        anchors.top: parent.top
+        anchors.right: parent.right
         anchors.margins: 20
         spacing: 8
 
-        // Preview Image with Drag Support
+        // Preview Image with Drag Support — tamaño FIJO (la imagen se recorta
+        // para llenar la caja, así el preview no cambia de tamaño por captura)
         ClippingRectangle {
             id: imgContainer
 
-            // Calculate scale to fit within 250x250 while preserving aspect ratio
-            property real maxWidth: 250
-            property real maxHeight: 250
-            property real imgRatio: img.sourceSize.width / img.sourceSize.height
-            property real boxRatio: maxWidth / maxHeight
+            property real previewWidth: 320
+            property real previewHeight: 200
 
-            width: {
-                if (img.sourceSize.width <= 0)
-                    return 0;
-                if (imgRatio > boxRatio)
-                    return maxWidth;
-                return Math.min(maxWidth, img.sourceSize.width * (maxHeight / img.sourceSize.height));
-            }
-
-            height: {
-                if (img.sourceSize.height <= 0)
-                    return 0;
-                if (imgRatio > boxRatio)
-                    return Math.min(maxHeight, img.sourceSize.height * (maxWidth / img.sourceSize.width));
-                return maxHeight;
-            }
+            width: previewWidth
+            height: previewHeight
 
             radius: Styling.radius(4)
             color: "transparent"
@@ -189,10 +180,14 @@ PanelWindow {
             }
         }
 
-        // Action Buttons
-        Column {
-            spacing: 4
-            anchors.verticalCenter: parent.verticalCenter
+        // Action Buttons — en fila, centrados debajo del preview
+        Item {
+            width: imgContainer.width
+            height: 36
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 6
 
             // Copy
             ActionButton {
@@ -210,6 +205,12 @@ PanelWindow {
             ActionButton {
                 icon: Icons.disk
                 onTriggered: {
+                    // Guardar al disco permanente (la captura vive en /tmp)
+                    if (root.savePath !== "") {
+                        var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
+                        proc.command = ["cp", root.imagePath, root.savePath];
+                        proc.running = true;
+                    }
                     root.imagePath = ""; // Hide overlay
                 }
                 StyledToolTip {
@@ -222,15 +223,48 @@ PanelWindow {
             ActionButton {
                 icon: Icons.edit
                 onTriggered: {
-                    // Open with Gradia (native or Flatpak for Fedora) detached
+                    // Abrir satty (anotador) flotante: lee el temp, guarda al disco
+                    // permanente con Ctrl+S y copia con Ctrl+C (early-exit al terminar).
                     var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
-                    proc.command = ["bash", "-c", "if command -v gradia >/dev/null; then gradia \"" + root.imagePath + "\"; else flatpak run be.alexandervanhee.gradia \"" + root.imagePath + "\"; fi & disown"];
+                    proc.command = ["hyprctl", "dispatch", "exec",
+                        "[float;size 1100 760;center] satty --filename '" + root.imagePath
+                        + "' --output-filename '" + root.savePath + "' --copy-command wl-copy --early-exit"];
                     proc.running = true;
                     root.imagePath = "";
                 }
                 StyledToolTip {
                     show: parent.containsMouse
-                    tooltipText: "Edit with Gradia"
+                    tooltipText: "Edit with Satty"
+                }
+            }
+
+            // Save as… (file dialog). GTK_USE_PORTAL=0 forces zenity's own dialog
+            // (con campo de nombre editable) en vez del portal yazi/termfilechooser.
+            ActionButton {
+                icon: Icons.folder
+                onTriggered: {
+                    var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
+                    var src = root.imagePath;
+                    proc.command = ["bash", "-c",
+                        "dest=$(GTK_USE_PORTAL=0 zenity --file-selection --save --confirm-overwrite " +
+                        "--filename=\"$(xdg-user-dir PICTURES)/Screenshots/Screenshot_$(date +%Y-%m-%d_%H-%M-%S).png\" 2>/dev/null); " +
+                        "[ -n \"$dest\" ] && cp '" + src + "' \"$dest\""];
+                    proc.running = true;
+                }
+                StyledToolTip {
+                    show: parent.containsMouse
+                    tooltipText: "Save as…"
+                }
+            }
+
+            // Pin (keep the preview open, no auto-hide)
+            ActionButton {
+                icon: Icons.pin
+                variant: root.pinned ? "primary" : "common"
+                onTriggered: root.pinned = !root.pinned
+                StyledToolTip {
+                    show: parent.containsMouse
+                    tooltipText: root.pinned ? "Unpin" : "Pin (keep open)"
                 }
             }
 
@@ -252,8 +286,9 @@ PanelWindow {
                     tooltipText: "Delete"
                 }
             }
-        }
-    }
+            } // Row
+        } // Item
+    } // mainColumn
 
     // Helper Component for Buttons
     component ActionButton: MouseArea {

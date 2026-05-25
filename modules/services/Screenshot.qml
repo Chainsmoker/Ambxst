@@ -24,6 +24,9 @@ QtObject {
     
     property string screenshotsDir: ""
     property string finalPath: ""
+    // Destino permanente si el usuario decide guardar (botón 💾 / Ctrl+S en satty).
+    // Por defecto las capturas son efímeras: se trabajan en /tmp y solo se copian.
+    property string pendingSavePath: ""
     
     property var _activeWorkspaceIds: []
     property var monitors: [] // List of monitor objects
@@ -186,7 +189,12 @@ QtObject {
             if (exitCode === 0) {
                 if (root.captureMode === "lens") {
                     root.runLensScript()
-                    root.captureMode = "normal" 
+                    root.captureMode = "normal"
+                } else if (root.captureMode === "edit") {
+                    // satty lee el temp; Ctrl+C copia (efímero), Ctrl+S guarda al
+                    // disco permanente (pendingSavePath). Nada se guarda solo.
+                    root.openEditor(root.finalPath, root.pendingSavePath)
+                    root.captureMode = "normal"
                 } else {
                     copyProcess.running = true
                     root.imageSaved(root.finalPath)
@@ -274,8 +282,9 @@ QtObject {
         for (var i = 0; i < root.monitors.length; i++) {
             var m = root.monitors[i];
             var path = root.tempPathBase + "_" + m.name + ".png";
-            // Ensure path is quoted safely
-            cmd += `grim -o "${m.name}" "${path}" & `;
+            // Ensure path is quoted safely. -l 1 = compresión PNG mínima: el freeze
+            // es ~3x más rápido (la captura ya no traba) y los archivos quedan chicos.
+            cmd += `grim -l 1 -o "${m.name}" "${path}" & `;
         }
         cmd += "wait";
         
@@ -305,7 +314,10 @@ QtObject {
                 root.screenshotsDir = Quickshell.env("HOME") + "/Pictures/Screenshots"
             }
             var filename = "Screenshot_" + getTimestamp() + ".png"
-            root.finalPath = root.screenshotsDir + "/" + filename
+            // Captura efímera: el archivo de trabajo vive en /tmp y solo se copia.
+            // Guardar al disco permanente es opcional (pendingSavePath).
+            root.pendingSavePath = root.screenshotsDir + "/" + filename
+            root.finalPath = "/tmp/" + filename
         }
         
         // Find monitor for these global logical coordinates
@@ -409,12 +421,40 @@ QtObject {
                 root.screenshotsDir = Quickshell.env("HOME") + "/Pictures/Screenshots"
             }
             var filename = "Screenshot_" + getTimestamp() + ".png"
-            root.finalPath = root.screenshotsDir + "/" + filename
+            // Captura efímera (ver processRegion).
+            root.pendingSavePath = root.screenshotsDir + "/" + filename
+            root.finalPath = "/tmp/" + filename
         }
         
         var srcPath = root.tempPathBase + "_" + monitorName + ".png";
         cropProcess.command = ["cp", srcPath, root.finalPath];
         cropProcess.running = true;
+    }
+
+    // Abre satty (anotador) sobre la captura recortada. Lee y reescribe el mismo
+    // archivo al guardar (Ctrl+S) y copia al portapapeles con wl-copy (Ctrl+C).
+    property Process editProcess: Process {
+        id: editProcess
+        command: []
+        onExited: exitCode => {
+            if (exitCode !== 0) {
+                console.warn("Screenshot: satty exited with code " + exitCode);
+            }
+        }
+    }
+
+    function openEditor(inputPath, savePath) {
+        // Hyprland 0.55.2 tiene rota la aplicación de `windowrule` (issue #12808),
+        // así que flotamos satty con reglas inline vía `hyprctl dispatch exec`,
+        // igual que el file picker (ver bin/yazi-portal-wrapper en dotfiles).
+        // Lee de inputPath (temp efímero) y, al guardar con Ctrl+S, escribe a
+        // savePath (disco permanente). Ctrl+C solo copia al portapapeles.
+        var rules = "[float;size 1100 760;center]";
+        var inner = "satty --filename '" + inputPath + "'"
+                  + " --output-filename '" + savePath + "'"
+                  + " --copy-command wl-copy --early-exit";
+        editProcess.command = ["hyprctl", "dispatch", "exec", rules + " " + inner];
+        editProcess.running = true;
     }
 
     property Process openScreenshotsProcess: Process {
