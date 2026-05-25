@@ -55,9 +55,9 @@ PanelWindow {
     // Accent dinámico por tab — define el color del border + active pill
     readonly property color tabAccent: {
         switch (currentTab) {
-            case 0: return Colors.primary;        // tech news: matugen primary
-            case 1: return "#E07556";             // CVEs: Alert orange/tomato
-            case 2: return "#FF4500";             // Reddit: Orange
+            case 0: return Colors.primary;        // tech news → primary matugen
+            case 1: return Colors.error;          // CVEs → error matugen (alerta)
+            case 2: return Colors.tertiary;       // Reddit → tertiary matugen
         }
         return Colors.primary;
     }
@@ -209,23 +209,23 @@ PanelWindow {
                         id: liveBadge
                         height: 22
                         width: liveRow.implicitWidth + 16
-                        radius: 11
-                        color: Qt.rgba(1, 1, 1, 0.12)
-                        border.color: Qt.rgba(1, 1, 1, 0.2)
+                        radius: 0
+                        color: "transparent"
+                        border.color: dock.tabAccent
                         border.width: 1
 
                         Row {
                             id: liveRow
                             anchors.centerIn: parent
                             spacing: 6
-                            
+
                             Rectangle {
                                 width: 6
                                 height: 6
-                                radius: 3
-                                color: "#2ecc71"
+                                radius: 0
+                                color: dock.tabAccent
                                 anchors.verticalCenter: parent.verticalCenter
-                                
+
                                 SequentialAnimation on opacity {
                                     loops: Animation.Infinite
                                     NumberAnimation { from: 1.0; to: 0.3; duration: 800; easing.type: Easing.InOutQuad }
@@ -235,7 +235,7 @@ PanelWindow {
 
                             Text {
                                 text: "LIVE FEED"
-                                color: "white"
+                                color: Colors.overBackground
                                 font.family: Config.theme.font
                                 font.pixelSize: Styling.fontSize(-2)
                                 font.weight: Font.Bold
@@ -255,8 +255,8 @@ PanelWindow {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: 16
-                            color: closeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : "transparent"
+                            radius: 0
+                            color: closeMouse.containsMouse ? Qt.rgba(dock.tabAccent.r, dock.tabAccent.g, dock.tabAccent.b, 0.22) : "transparent"
                             Behavior on color { ColorAnimation { duration: 150 } }
                         }
 
@@ -265,7 +265,7 @@ PanelWindow {
                             text: Icons.cancel
                             font.family: Icons.font
                             font.pixelSize: 16
-                            color: "white"
+                            color: Colors.overBackground
                         }
 
                         MouseArea {
@@ -282,20 +282,29 @@ PanelWindow {
                     Layout.fillWidth: true
                     spacing: 2
 
-                    Text {
-                        text: "News & Security"
-                        color: "white"
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(3)
-                        font.weight: Font.ExtraBold
+                    RowLayout {
                         Layout.fillWidth: true
+                        spacing: 8
+                        Rectangle { width: 5; Layout.preferredHeight: titleT.implicitHeight; color: dock.tabAccent }
+                        Text {
+                            id: titleT
+                            text: "NEWS // SECURITY"
+                            color: Colors.overBackground
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(3)
+                            font.weight: Font.ExtraBold
+                            font.letterSpacing: 1
+                            Layout.fillWidth: true
+                        }
                     }
 
                     Text {
-                        text: "Your curated tech and vulnerability updates"
-                        color: Qt.rgba(255, 255, 255, 0.8)
+                        text: "CURATED TECH & VULNERABILITY UPDATES"
+                        color: Colors.outline
                         font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(-1)
+                        font.pixelSize: Styling.fontSize(-2)
+                        font.weight: Font.Bold
+                        font.letterSpacing: 1.5
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
                     }
@@ -363,12 +372,12 @@ PanelWindow {
 
                     width: 64
                     height: 40
-                    radius: 12
+                    radius: 0
                     color: isActive
                         ? dock.tabAccent
-                        : (pillMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(0, 0, 0, 0.42))
-                    border.color: isActive ? Qt.rgba(1, 1, 1, 0.35) : Qt.rgba(1, 1, 1, 0.15)
-                    border.width: 1
+                        : (pillMouse.containsMouse ? Qt.rgba(dock.tabAccent.r, dock.tabAccent.g, dock.tabAccent.b, 0.15) : "transparent")
+                    border.color: isActive ? dock.tabAccent : Colors.outline
+                    border.width: 2
                     Behavior on color { ColorAnimation { duration: 220 } }
                     Behavior on border.color { ColorAnimation { duration: 220 } }
 
@@ -378,7 +387,7 @@ PanelWindow {
                         textFormat: Text.RichText
                         font.family: Icons.font
                         font.pixelSize: 18
-                        color: "white"
+                        color: pill.isActive ? Colors.background : Colors.overBackground
                     }
 
                     MouseArea {
@@ -483,17 +492,39 @@ PanelWindow {
                                 required property var modelData
                                 required property int index
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: cveCol.implicitHeight + 16
+                                Layout.preferredHeight: cveCol.implicitHeight
                                 variant: "internalbg"
-                                radius: 16
+                                radius: 0
                                 enableShadow: false
 
                                 property bool isHovered: false
-                                scale: isHovered ? 1.02 : 1.0
-                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+                                function sevColor(s) {
+                                    var v = ("" + s).toLowerCase();
+                                    if (v.indexOf("crit") >= 0) return Colors.error;
+                                    if (v.indexOf("high") >= 0) return Colors.tertiary;
+                                    if (v.indexOf("med")  >= 0) return Colors.secondary;
+                                    return Colors.outline; // low / desconocido
+                                }
+                                property color accent: sevColor(modelData.severity)
 
                                 HoverHandler {
                                     onHoveredChanged: cveCard.isHovered = hovered
+                                }
+
+                                // Barra de severidad (matugen) a la izquierda
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    width: 4
+                                    color: cveCard.accent
+                                    z: 2
+                                }
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: cveCard.accent
+                                    opacity: cveCard.isHovered ? 0.08 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
                                 }
 
                                 MouseArea {
@@ -511,106 +542,67 @@ PanelWindow {
                                     anchors.left: parent.left
                                     anchors.right: parent.right
                                     anchors.top: parent.top
-                                    spacing: 0
+                                    anchors.leftMargin: 4
+                                    spacing: 6
 
-                                    // Top Section: Severity Gradient & Shield
-                                    Item {
-                                        id: cveHeaderArea
+                                    // Fila superior: shield + severidad (CAPS) + score (mono grande)
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 120
-                                        clip: true
-
-                                        layer.enabled: true
-                                        layer.effect: MultiEffect {
-                                            maskEnabled: true
-                                            maskSource: ShaderEffectSource {
-                                                sourceItem: Rectangle {
-                                                    width: cveHeaderArea.width
-                                                    height: cveHeaderArea.height
-                                                    topLeftRadius: 16
-                                                    topRightRadius: 16
-                                                    color: "black"
-                                                }
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            gradient: Gradient {
-                                                GradientStop { position: 0.0; color: cveCard.modelData.color }
-                                                GradientStop { position: 1.0; color: Qt.darker(cveCard.modelData.color, 1.8) }
-                                            }
-
-                                            Rectangle {
-                                                width: 80
-                                                height: 80
-                                                radius: 40
-                                                color: Qt.rgba(1, 1, 1, 0.08)
-                                                x: parent.width - 40
-                                                y: -20
-                                            }
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: Icons.shield
-                                                color: Qt.rgba(1, 1, 1, 0.9)
-                                                font.family: Icons.font
-                                                font.pixelSize: 48
-                                                
-                                                scale: cveCard.isHovered ? 1.1 : 1.0
-                                                Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
-                                            }
-                                        }
-
-                                        // Floating severity badge
-                                        Rectangle {
-                                            anchors.left: parent.left
-                                            anchors.top: parent.top
-                                            anchors.margins: 12
-                                            height: 24
-                                            width: sevText.implicitWidth + 16
-                                            radius: 12
-                                            color: Qt.rgba(0, 0, 0, 0.6)
-                                            border.color: Qt.rgba(1, 1, 1, 0.2)
-                                            border.width: 1
-
-                                            Text {
-                                                id: sevText
-                                                anchors.centerIn: parent
-                                                text: cveCard.modelData.severity + " (" + cveCard.modelData.score + ")"
-                                                color: "white"
-                                                font.family: Config.theme.font
-                                                font.pixelSize: Styling.fontSize(-2)
-                                                font.weight: Font.Bold
-                                            }
-                                        }
-                                    }
-
-                                    // Bottom Section: Info and Text
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        Layout.margins: 16
+                                        Layout.leftMargin: 14
+                                        Layout.rightMargin: 14
+                                        Layout.topMargin: 12
                                         spacing: 8
 
                                         Text {
-                                            text: cveCard.modelData.cve
-                                            color: Colors.overBackground
-                                            font.family: Config.theme.monoFont
-                                            font.pixelSize: Styling.fontSize(0)
-                                            font.weight: Font.Bold
-                                            Layout.fillWidth: true
+                                            text: Icons.shield
+                                            font.family: Icons.font
+                                            font.pixelSize: 16
+                                            color: cveCard.accent
                                         }
-
                                         Text {
-                                            text: cveCard.modelData.description
-                                            color: Colors.outline
+                                            text: ("" + cveCard.modelData.severity).toUpperCase()
+                                            color: cveCard.accent
                                             font.family: Config.theme.font
                                             font.pixelSize: Styling.fontSize(-1)
-                                            Layout.fillWidth: true
-                                            wrapMode: Text.WordWrap
-                                            opacity: 0.85
-                                            lineHeight: 1.2
+                                            font.weight: Font.ExtraBold
+                                            font.letterSpacing: 1.5
                                         }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: cveCard.modelData.score
+                                            color: cveCard.accent
+                                            font.family: Config.theme.monoFont
+                                            font.pixelSize: Styling.fontSize(1)
+                                            font.weight: Font.ExtraBold
+                                        }
+                                    }
+
+                                    // CVE-ID (mono, bold)
+                                    Text {
+                                        text: cveCard.modelData.cve
+                                        color: Colors.overBackground
+                                        font.family: Config.theme.monoFont
+                                        font.pixelSize: Styling.fontSize(0)
+                                        font.weight: Font.Bold
+                                        Layout.fillWidth: true
+                                        Layout.leftMargin: 14
+                                        Layout.rightMargin: 14
+                                    }
+
+                                    // Descripción
+                                    Text {
+                                        text: cveCard.modelData.description
+                                        color: Colors.outline
+                                        font.family: Config.theme.font
+                                        font.pixelSize: Styling.fontSize(-1)
+                                        Layout.fillWidth: true
+                                        Layout.leftMargin: 14
+                                        Layout.rightMargin: 14
+                                        Layout.bottomMargin: 14
+                                        wrapMode: Text.WordWrap
+                                        maximumLineCount: 3
+                                        elide: Text.ElideRight
+                                        lineHeight: 1.2
                                     }
                                 }
                             }
@@ -651,17 +643,34 @@ PanelWindow {
             required property var modelData
             required property int index
             Layout.fillWidth: true
-            Layout.preferredHeight: contentColumn.implicitHeight + 16
+            Layout.preferredHeight: contentColumn.implicitHeight
             variant: "internalbg"
-            radius: 16
+            radius: 0
             enableShadow: false
 
             property bool isHovered: false
-            scale: isHovered ? 1.02 : 1.0
-            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+            property color accent: dock.tabAccent
 
             HoverHandler {
                 onHoveredChanged: cardRect.isHovered = hovered
+            }
+
+            // Barra de acento gruesa a la izquierda (brutalista)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 4
+                color: cardRect.accent
+                opacity: cardRect.isHovered ? 1.0 : 0.85
+                z: 2
+            }
+            // Resalte de bloque en hover
+            Rectangle {
+                anchors.fill: parent
+                color: cardRect.accent
+                opacity: cardRect.isHovered ? 0.08 : 0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
             }
 
             MouseArea {
@@ -679,133 +688,71 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
+                anchors.leftMargin: 4   // deja ver la barra de acento
                 spacing: 0
 
-                // Top Section: Image or Fallback
+                // Imagen (bloque recto, sin máscara redondeada). Solo si hay imagen.
                 Item {
                     id: imageArea
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 180
+                    Layout.preferredHeight: cardRect.modelData.image !== "" ? 150 : 0
+                    visible: cardRect.modelData.image !== ""
                     clip: true
 
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled: true
-                        maskSource: ShaderEffectSource {
-                            sourceItem: Rectangle {
-                                width: imageArea.width
-                                height: imageArea.height
-                                topLeftRadius: 16
-                                topRightRadius: 16
-                                color: "black"
-                            }
-                        }
-                    }
-
-                    // Fallback Bg
-                    Rectangle {
-                        id: fallbackBg
-                        anchors.fill: parent
-                        visible: !thumbImage.visible || thumbImage.status !== Image.Ready
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: cardRect.modelData.tagColor }
-                            GradientStop { position: 1.0; color: Qt.darker(cardRect.modelData.tagColor, 1.8) }
-                        }
-
-                        Rectangle {
-                            width: 120
-                            height: 120
-                            radius: 60
-                            color: Qt.rgba(1, 1, 1, 0.1)
-                            x: parent.width - 60
-                            y: -30
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: cardRect.modelData.tag
-                            color: Qt.rgba(1, 1, 1, 0.9)
-                            font.family: Config.theme.font
-                            font.pixelSize: 36
-                            font.weight: Font.Bold
-                            font.letterSpacing: 2
-                        }
-                    }
-
-                    // Actual Image
                     Image {
                         id: thumbImage
                         anchors.fill: parent
                         source: cardRect.modelData.image || ""
-                        visible: cardRect.modelData.image !== ""
                         opacity: status === Image.Ready ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 200 } }
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
-
-                        scale: cardRect.isHovered ? 1.05 : 1.0
-                        Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
                     }
-
-                    // Floating tag badge
+                    // Oscurecido inferior (legibilidad / look difuminado)
                     Rectangle {
-                        anchors.left: parent.left
-                        anchors.top: parent.top
-                        anchors.margins: 12
-                        height: 24
-                        width: tagText.implicitWidth + 16
-                        radius: 12
-                        color: Qt.rgba(0, 0, 0, 0.6)
-                        border.color: Qt.rgba(1, 1, 1, 0.2)
-                        border.width: 1
-
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: cardRect.modelData.tagColor
-                            }
-                            Text {
-                                id: tagText
-                                text: cardRect.modelData.tag
-                                color: "white"
-                                font.family: Config.theme.font
-                                font.pixelSize: Styling.fontSize(-2)
-                                font.weight: Font.Bold
-                            }
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            GradientStop { position: 0.45; color: "transparent" }
+                            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.55) }
                         }
                     }
                 }
 
-                // Bottom Section: Info and Text
+                // Bloque de texto
                 ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.margins: 16
-                    spacing: 8
+                    Layout.leftMargin: 14
+                    Layout.rightMargin: 14
+                    Layout.topMargin: 12
+                    Layout.bottomMargin: 14
+                    spacing: 6
 
+                    // Fuente / tag — ALL-CAPS bold con acento (brutalista)
                     Text {
-                        text: cardRect.modelData.source
-                        color: Colors.outline
+                        text: (cardRect.modelData.tag + "  //  " + cardRect.modelData.source).toUpperCase()
+                        color: cardRect.accent
                         font.family: Config.theme.font
                         font.pixelSize: Styling.fontSize(-2)
-                        opacity: 0.8
+                        font.weight: Font.Bold
+                        font.letterSpacing: 1.5
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
                     }
 
+                    // Título — extra bold fuerte
                     Text {
                         text: cardRect.modelData.title
                         color: Colors.overBackground
                         font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(0)
-                        font.weight: Font.Bold
+                        font.pixelSize: Styling.fontSize(1)
+                        font.weight: Font.ExtraBold
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        lineHeight: 1.15
+                        lineHeight: 1.1
                     }
 
+                    // Excerpt
                     Text {
                         text: cardRect.modelData.excerpt
                         color: Colors.outline
@@ -813,7 +760,8 @@ PanelWindow {
                         font.pixelSize: Styling.fontSize(-1)
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        opacity: 0.85
+                        maximumLineCount: 3
+                        elide: Text.ElideRight
                         lineHeight: 1.2
                     }
                 }
@@ -870,19 +818,20 @@ PanelWindow {
                     Layout.alignment: Qt.AlignHCenter
                     width: 110
                     height: 36
-                    radius: 12
-                    color: retryMouse.containsMouse ? dock.tabAccent : Qt.rgba(1, 1, 1, 0.1)
-                    border.color: Qt.rgba(1, 1, 1, 0.2)
-                    border.width: 1
+                    radius: 0
+                    color: retryMouse.containsMouse ? dock.tabAccent : "transparent"
+                    border.color: dock.tabAccent
+                    border.width: 2
                     Behavior on color { ColorAnimation { duration: 150 } }
 
                     Text {
                         anchors.centerIn: parent
-                        text: "Retry"
-                        color: "white"
+                        text: "RETRY"
+                        color: retryMouse.containsMouse ? Colors.background : Colors.overBackground
                         font.family: Config.theme.font
                         font.pixelSize: Styling.fontSize(-1)
                         font.weight: Font.Bold
+                        font.letterSpacing: 1.5
                     }
 
                     MouseArea {
