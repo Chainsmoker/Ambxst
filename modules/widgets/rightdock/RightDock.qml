@@ -311,27 +311,28 @@ PanelWindow {
                         radius: Styling.radius(8)
                         clip: true
 
+                        // Cielo derivado de la paleta matugen (varía por hora del día).
                         function topColor(h) {
-                            if (h < 5)   return "#0a0c1f";  // night
-                            if (h < 6.5) return "#5a3a64";  // pre-dawn purple
-                            if (h < 7.5) return "#ff9c5c";  // dawn warm
-                            if (h < 12)  return "#7fc8e8";  // morning light blue
-                            if (h < 16)  return "#5dadeb";  // afternoon
-                            if (h < 18)  return "#ff8a4a";  // sunset
-                            if (h < 20)  return "#7a4a8a";  // dusk
-                            if (h < 22)  return "#231a3a";  // late evening
-                            return "#0a0c1f";
+                            if (h < 5)   return Qt.darker(Colors.background, 1.3);  // noche
+                            if (h < 6.5) return Qt.darker(Colors.secondary, 1.5);   // pre-amanecer
+                            if (h < 7.5) return Qt.lighter(Colors.tertiary, 1.1);   // amanecer
+                            if (h < 12)  return Qt.lighter(Colors.primary, 1.25);   // mañana
+                            if (h < 16)  return Colors.primary;                     // tarde
+                            if (h < 18)  return Colors.tertiary;                    // atardecer
+                            if (h < 20)  return Qt.darker(Colors.secondary, 1.2);   // crepúsculo
+                            if (h < 22)  return Qt.darker(Colors.background, 1.15);  // anochecer
+                            return Qt.darker(Colors.background, 1.3);
                         }
                         function bottomColor(h) {
-                            if (h < 5)   return "#020412";
-                            if (h < 6.5) return "#cc7c9e";
-                            if (h < 7.5) return "#ffe4b8";
-                            if (h < 12)  return "#cfe9f7";
-                            if (h < 16)  return "#9fd0ec";
-                            if (h < 18)  return "#fcca8a";
-                            if (h < 20)  return "#382650";
-                            if (h < 22)  return "#0f1228";
-                            return "#020412";
+                            if (h < 5)   return Qt.darker(Colors.surface, 1.4);
+                            if (h < 6.5) return Qt.darker(Colors.tertiary, 1.2);
+                            if (h < 7.5) return Qt.lighter(Colors.tertiary, 1.35);
+                            if (h < 12)  return Qt.lighter(Colors.primary, 1.5);
+                            if (h < 16)  return Qt.lighter(Colors.primary, 1.25);
+                            if (h < 18)  return Qt.lighter(Colors.tertiary, 1.2);
+                            if (h < 20)  return Qt.darker(Colors.secondary, 1.5);
+                            if (h < 22)  return Qt.darker(Colors.surface, 1.2);
+                            return Qt.darker(Colors.surface, 1.4);
                         }
 
                         gradient: Gradient {
@@ -345,6 +346,19 @@ PanelWindow {
                                 position: 1.0
                                 color: calendarBg.bottomColor(calendarTab.hourOfDay)
                                 Behavior on color { ColorAnimation { duration: 3000 } }
+                            }
+                        }
+
+                        // Difuminado/vignette — oscurece sutil para dar profundidad y
+                        // contraste (look "difuminado" tipo pomodoro). Va sobre el cielo
+                        // pero debajo del sol/luna/estrellas.
+                        Rectangle {
+                            anchors.fill: parent
+                            gradient: Gradient {
+                                orientation: Gradient.Vertical
+                                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.30) }
+                                GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, 0.12) }
+                                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.55) }
                             }
                         }
 
@@ -371,37 +385,53 @@ PanelWindow {
                             }
                         }
 
-                        // Sol (mañana hasta sunset)
-                        Rectangle {
+                        // Sol (mañana hasta sunset) — disco matugen cálido con halo difuso multicapa
+                        Item {
                             visible: calendarTab.hourOfDay >= 6.5 && calendarTab.hourOfDay < 18
-                            width: 70; height: 70; radius: 35
-                            x: parent.width - width - 24
-                            y: 24
-                            color: calendarTab.hourOfDay < 7.5 ? "#ffd093" :
-                                   calendarTab.hourOfDay < 17 ? "#ffe57a" : "#ff9550"
-                            Behavior on color { ColorAnimation { duration: 3000 } }
-                            // Halo difuminado
+                            width: 70; height: 70
+                            x: parent.width - width - 28
+                            y: 28
+
+                            property color sunColor: calendarTab.hourOfDay < 7.5 ? Qt.lighter(Colors.tertiary, 1.2)
+                                                   : calendarTab.hourOfDay < 17 ? Qt.lighter(Colors.primary, 1.45)
+                                                   : Colors.tertiary
+                            Behavior on sunColor { ColorAnimation { duration: 3000 } }
+
+                            // Halos difusos (de fuera hacia dentro)
+                            Rectangle { anchors.centerIn: parent; width: 178; height: 178; radius: 89; color: parent.sunColor; opacity: 0.05 }
+                            Rectangle { anchors.centerIn: parent; width: 134; height: 134; radius: 67; color: parent.sunColor; opacity: 0.09 }
+                            Rectangle { anchors.centerIn: parent; width: 98;  height: 98;  radius: 49; color: parent.sunColor; opacity: 0.16 }
+                            // Disco
                             Rectangle {
                                 anchors.centerIn: parent
-                                width: 100; height: 100; radius: 50
-                                color: parent.color
-                                opacity: 0.25
-                                z: -1
+                                width: 70; height: 70; radius: 35
+                                color: parent.sunColor
                             }
                         }
 
-                        // Luna (noche)
-                        Rectangle {
+                        // Luna (noche) — disco matugen claro con halo suave + cráter (crescent)
+                        Item {
                             visible: calendarTab.hourOfDay < 5.5 || calendarTab.hourOfDay >= 20
-                            width: 60; height: 60; radius: 30
-                            x: parent.width - width - 24
-                            y: 24
-                            color: "#e8e6dc"
+                            width: 60; height: 60
+                            x: parent.width - width - 28
+                            y: 28
+
+                            property color moonColor: Qt.lighter(Colors.foreground, 1.05)
+
+                            // Halo suave
+                            Rectangle { anchors.centerIn: parent; width: 120; height: 120; radius: 60; color: parent.moonColor; opacity: 0.05 }
+                            Rectangle { anchors.centerIn: parent; width: 86;  height: 86;  radius: 43; color: parent.moonColor; opacity: 0.10 }
+                            // Disco + sombra (crescent del color del cielo, para que se funda)
                             Rectangle {
-                                width: 48; height: 48; radius: 24
-                                x: 14; y: -4
-                                color: calendarTab.hourOfDay < 5.5 || calendarTab.hourOfDay >= 22 ? "#0a0c1f" : "#231a3a"
-                                Behavior on color { ColorAnimation { duration: 3000 } }
+                                anchors.centerIn: parent
+                                width: 60; height: 60; radius: 30
+                                color: parent.moonColor
+                                Rectangle {
+                                    width: 48; height: 48; radius: 24
+                                    x: 16; y: -4
+                                    color: calendarBg.topColor(calendarTab.hourOfDay)
+                                    Behavior on color { ColorAnimation { duration: 3000 } }
+                                }
                             }
                         }
 
@@ -1021,15 +1051,15 @@ PanelWindow {
                                 position: 0.0
                                 color: {
                                     switch (weatherTab.weatherCategory) {
-                                        case "sunny":  return "#5dade2";
-                                        case "night":  return "#0c1a3e";
-                                        case "rainy":  return "#3a4f5e";
-                                        case "stormy": return "#1c2233";
-                                        case "snowy":  return "#a8c5e0";
-                                        case "foggy":  return "#7f8fa6";
-                                        case "cloudy": return "#6d7b8d";
+                                        case "sunny":  return Qt.lighter(Colors.primary, 1.2);
+                                        case "night":  return Qt.darker(Colors.background, 1.3);
+                                        case "rainy":  return Qt.darker(Colors.secondary, 1.3);
+                                        case "stormy": return Qt.darker(Colors.background, 1.6);
+                                        case "snowy":  return Qt.lighter(Colors.primary, 1.7);
+                                        case "foggy":  return Qt.lighter(Colors.surface, 1.3);
+                                        case "cloudy": return Qt.darker(Colors.secondary, 1.1);
                                     }
-                                    return "#6d7b8d";
+                                    return Colors.surface;
                                 }
                                 Behavior on color { ColorAnimation { duration: 1500 } }
                             }
@@ -1037,17 +1067,29 @@ PanelWindow {
                                 position: 1.0
                                 color: {
                                     switch (weatherTab.weatherCategory) {
-                                        case "sunny":  return "#fcb084";
-                                        case "night":  return "#020412";
-                                        case "rainy":  return "#1f2937";
-                                        case "stormy": return "#0a0a17";
-                                        case "snowy":  return "#e8eef5";
-                                        case "foggy":  return "#bfc7cf";
-                                        case "cloudy": return "#34404f";
+                                        case "sunny":  return Qt.lighter(Colors.tertiary, 1.25);
+                                        case "night":  return Qt.darker(Colors.surface, 1.5);
+                                        case "rainy":  return Qt.darker(Colors.surface, 1.3);
+                                        case "stormy": return Qt.darker(Colors.background, 2.0);
+                                        case "snowy":  return Qt.lighter(Colors.surface, 1.6);
+                                        case "foggy":  return Qt.lighter(Colors.surface, 1.1);
+                                        case "cloudy": return Qt.darker(Colors.surface, 1.2);
                                     }
-                                    return "#34404f";
+                                    return Qt.darker(Colors.surface, 1.2);
                                 }
                                 Behavior on color { ColorAnimation { duration: 1500 } }
+                            }
+                        }
+
+                        // Difuminado/vignette — mismo tratamiento que el calendario,
+                        // debajo de los efectos de clima (que quedan resaltados encima).
+                        Rectangle {
+                            anchors.fill: parent
+                            gradient: Gradient {
+                                orientation: Gradient.Vertical
+                                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.28) }
+                                GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, 0.10) }
+                                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.52) }
                             }
                         }
 
