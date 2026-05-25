@@ -40,6 +40,11 @@ Canvas {
         stdout: SplitParser {
             onRead: data => {
                 var heights = data.trim().split(';').map(Number);
+                // CAVA raw ascii output ends with a trailing semicolon, producing an extra empty element.
+                // We pop the last element if it is NaN.
+                if (heights.length > 0 && isNaN(heights[heights.length - 1])) {
+                    heights.pop();
+                }
                 if (heights.length === root.numBars) {
                     // Validate values
                     for (var i = 0; i < root.numBars; i++) {
@@ -85,7 +90,7 @@ Canvas {
     }
 
     // =========================================================================
-    // Rendering
+    // Rendering (Bouncing Bars across the entire Canvas width)
     // =========================================================================
     onPaint: {
         var ctx = getContext("2d");
@@ -96,33 +101,27 @@ Canvas {
         ctx.fillStyle = root.color;
 
         var barW = root.lineWidth;
-        // Calculate spacing based on fullLength (total slider width)
-        var spacing = (root.fullLength - (root.numBars * barW)) / (root.numBars - 1);
+        // Calculate spacing evenly across the canvas width
+        var spacing = (width - (root.numBars * barW)) / (root.numBars - 1);
         if (spacing < 1) spacing = 1;
 
         var maxVal = 100.0; // matching ascii_max_range in cava config
 
         for (var i = 0; i < root.numBars; i++) {
-            // Calculate X position of each bar along the slider's full length
             var barX = i * (barW + spacing);
+            var rawH = root.barHeights[i] || 0;
+            var hVal = (rawH / maxVal) * height;
 
-            // Only draw the bar if it falls within the current progress width
-            // This aligns the bars with the progress handle perfectly!
-            if (barX + barW <= root.width + 1) {
-                var rawH = root.barHeights[i] || 0;
-                var hVal = (rawH / maxVal) * height;
+            // Minimum height for aesthetic presence
+            if (hVal < 2) hVal = 2;
+            // Cap height
+            if (hVal > height) hVal = height;
 
-                // Minimum height for aesthetic presence
-                if (hVal < 2) hVal = 2;
-                // Cap height
-                if (hVal > height) hVal = height;
+            var y = (height - hVal) / 2;
 
-                var y = (height - hVal) / 2;
-
-                ctx.beginPath();
-                ctx.roundedRect(barX, y, barW, hVal, barW / 2, barW / 2);
-                ctx.fill();
-            }
+            ctx.beginPath();
+            ctx.roundedRect(barX, y, barW, hVal, barW / 2, barW / 2);
+            ctx.fill();
         }
     }
 }

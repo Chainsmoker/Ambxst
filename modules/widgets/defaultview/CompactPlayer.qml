@@ -23,9 +23,6 @@ Item {
     readonly property bool playerExpanded: compactPlayer.isPlaying || compactPlayer.notchHovered
 
     onPlayerChanged: {
-        if (!player) {
-            positionSlider.value = 0;
-        }
     }
 
     property bool isPlaying: player?.playbackState === MprisPlaybackState.Playing
@@ -111,26 +108,7 @@ Item {
         return Icons.player;
     }
 
-    Timer {
-        running: compactPlayer.isPlaying && compactPlayer.visible
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            if (!positionSlider.isDragging) {
-                positionSlider.value = compactPlayer.length > 0 ? Math.min(1.0, compactPlayer.position / compactPlayer.length) : 0;
-            }
-            compactPlayer.player?.positionChanged();
-        }
-    }
 
-    Connections {
-        target: compactPlayer.player
-        function onPositionChanged() {
-            if (!positionSlider.isDragging && compactPlayer.player) {
-                positionSlider.value = compactPlayer.length > 0 ? Math.min(1.0, compactPlayer.position / compactPlayer.length) : 0;
-            }
-        }
-    }
 
     StyledRect {
         variant: "common"
@@ -399,15 +377,15 @@ Item {
                 }
             }
 
-            PositionSlider {
-                id: positionSlider
+            WavyLine {
+                id: visualizer
                 Layout.fillWidth: true
-                Layout.preferredHeight: 4
+                Layout.preferredHeight: 12
                 Layout.leftMargin: compactPlayer.playerExpanded ? 0 : 8
                 Layout.rightMargin: compactPlayer.playerExpanded ? 0 : 8
-                player: compactPlayer.player
+                active: compactPlayer.isPlaying
                 visible: compactPlayer.playerExpanded
-                hasArtwork: compactPlayer.hasArtwork || compactPlayer.wallpaperPath !== ""
+                color: (hasArtwork || wallpaperPath !== "") ? Styling.srItem("overprimary") : Colors.overBackground
             }
 
             Text {
