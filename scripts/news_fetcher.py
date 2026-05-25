@@ -203,6 +203,43 @@ def get_cves():
                 score_val = 2.5
             else:
                 score_val = 5.0
+        elif "cveMetadata" in item:
+            # CVE v5 format (New standard from CIRCL API)
+            metadata = item["cveMetadata"]
+            cve_id = metadata.get("cveId") or "CVE-Unknown"
+            
+            # Find description
+            description = "No description provided."
+            cna = item.get("containers", {}).get("cna", {})
+            descriptions = cna.get("descriptions", [])
+            for desc in descriptions:
+                if desc.get("lang") == "en" and desc.get("value"):
+                    description = desc.get("value")
+                    break
+            if description == "No description provided." and descriptions:
+                description = descriptions[0].get("value") or description
+                
+            if len(description) > 200:
+                description = description[:200] + "..."
+                
+            # Find CVSS score
+            score_val = None
+            metrics = cna.get("metrics", [])
+            for metric in metrics:
+                for cvss_key in ["cvssV4_0", "cvssV3_1", "cvssV3_0", "cvssV2_0"]:
+                    if cvss_key in metric:
+                        val = metric[cvss_key].get("baseScore")
+                        if val is not None:
+                            try:
+                                score_val = float(val)
+                                break
+                            except ValueError:
+                                pass
+                if score_val is not None:
+                    break
+            
+            if score_val is None:
+                score_val = 5.0
         else:
             # Standard OSV/CVE format
             cve_id = item.get("id", "CVE-Unknown")
