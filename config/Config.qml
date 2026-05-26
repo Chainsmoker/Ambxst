@@ -133,6 +133,10 @@ Singleton {
         adapter: JsonAdapter {
             property bool oledMode: false
             property bool lightMode: false
+            // Tint widget backgrounds with a matugen tone instead of near-black
+            property bool tintedBackground: false
+            // CAVA visualizer style: "blocks" | "smooth" | "bars" | "dots" | "waves"
+            property string cavaStyle: "blocks"
             property int roundness: 16
             property string font: "Roboto Condensed"
             property int fontSize: 14

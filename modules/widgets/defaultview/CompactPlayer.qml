@@ -380,10 +380,11 @@ Item {
             WavyLine {
                 id: visualizer
                 Layout.fillWidth: true
-                Layout.preferredHeight: 12
+                Layout.preferredHeight: 18
                 Layout.leftMargin: compactPlayer.playerExpanded ? 0 : 8
                 Layout.rightMargin: compactPlayer.playerExpanded ? 0 : 8
                 active: compactPlayer.isPlaying
+                cavaStyle: Config.theme.cavaStyle
                 visible: compactPlayer.playerExpanded
                 color: (hasArtwork || wallpaperPath !== "") ? Styling.srItem("overprimary") : Colors.overBackground
             }

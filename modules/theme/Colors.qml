@@ -168,7 +168,7 @@ FileView {
         property color sourceColor: "#7f2424"
     }
 
-    property color background: Config.oledMode ? "#000000" : adapter.background
+    property color background: Config.oledMode ? "#000000" : (Config.theme.tintedBackground ? Qt.tint(adapter.background, Qt.rgba(adapter.surfaceTint.r, adapter.surfaceTint.g, adapter.surfaceTint.b, 0.24)) : adapter.background)
 
     property color surface: Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.1))
     property color surfaceBright: Qt.tint(background, Qt.rgba(adapter.overBackground.r, adapter.overBackground.g, adapter.overBackground.b, 0.2))

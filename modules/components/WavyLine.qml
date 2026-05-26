@@ -21,6 +21,8 @@ Canvas {
     property bool useCava: true
     // En modo no-cava: false = línea sinusoidal; true = barras animadas (ecualizador).
     property bool barStyle: false
+    // Estilo del visualizador CAVA: "blocks" (brutal), "smooth", "bars" (grounded), "dots".
+    property string cavaStyle: "blocks"
 
     // Legacy compatibility
     property real amplitude: lineWidth * amplitudeMultiplier
@@ -170,28 +172,72 @@ Canvas {
             return;
         }
 
+        // CAVA visualizer — selectable styles.
         ctx.fillStyle = root.color;
-
-        var barW = root.lineWidth;
-        var spacing = (width - (root.numBars * barW)) / (root.numBars - 1);
-        if (spacing < 1) spacing = 1;
-
         var maxVal = 100.0; // matching ascii_max_range in cava config
+        var slot = width / root.numBars;
 
-        for (var i = 0; i < root.numBars; i++) {
-            var barX = i * (barW + spacing);
-            var rawH = root.barHeights[i] || 0;
-            var hVal = (rawH / maxVal) * height;
+        function normAt(idx, exp) {
+            var v = (root.barHeights[idx] || 0) / maxVal;
+            if (v < 0)
+                v = 0;
+            if (v > 1)
+                v = 1;
+            return exp !== 1 ? Math.pow(v, exp) : v;
+        }
 
-            // Minimum height for aesthetic presence
-            if (hVal < 2) hVal = 2;
-            if (hVal > height) hVal = height;
-
-            var y = (height - hVal) / 2;
-
-            ctx.beginPath();
-            ctx.roundedRect(barX, y, barW, hVal, barW / 2, barW / 2);
-            ctx.fill();
+        if (root.cavaStyle === "smooth") {
+            // Previous look: thinner rounded bars, centered, linear response.
+            var sbw = Math.max(2, slot * 0.5);
+            for (var si = 0; si < root.numBars; si++) {
+                var sh = Math.max(2, normAt(si, 1) * height);
+                ctx.beginPath();
+                ctx.roundedRect(si * slot + (slot - sbw) / 2, (height - sh) / 2, sbw, sh, sbw / 2, sbw / 2);
+                ctx.fill();
+            }
+        } else if (root.cavaStyle === "bars") {
+            // Classic equalizer: sharp bars grounded at the bottom, growing up.
+            var gbw = Math.max(2, slot * 0.7);
+            for (var gi = 0; gi < root.numBars; gi++) {
+                var gh = Math.max(2, normAt(gi, 1.3) * height);
+                ctx.fillRect(gi * slot + (slot - gbw) / 2, height - gh, gbw, gh);
+            }
+        } else if (root.cavaStyle === "dots") {
+            // A dot per band that rises with the level.
+            var r = Math.max(2, Math.min(slot * 0.34, height * 0.45));
+            for (var di = 0; di < root.numBars; di++) {
+                var dcx = di * slot + slot / 2;
+                var dcy = height - r - normAt(di, 1) * (height - 2 * r);
+                ctx.beginPath();
+                ctx.arc(dcx, dcy, r, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        } else if (root.cavaStyle === "waves") {
+            // Traveling wave of rounded bars (like the mic slider), amplitude
+            // following the audio energy so it animates with the music.
+            var energy = 0;
+            for (var ei = 0; ei < root.numBars; ei++)
+                energy += (root.barHeights[ei] || 0);
+            energy = energy / (root.numBars * maxVal); // 0..1
+            var level = Math.max(0.15, Math.min(1, energy * 2.2));
+            var tt = Date.now() / 220.0;
+            var wbw = Math.max(2, slot * 0.6);
+            for (var wi = 0; wi < root.numBars; wi++) {
+                var wv = 0.5 + 0.5 * Math.sin(tt + wi * 0.55);
+                var wh = (0.18 + 0.72 * wv * (0.35 + 0.65 * level)) * height;
+                if (wh < 2)
+                    wh = 2;
+                ctx.beginPath();
+                ctx.roundedRect(wi * slot + (slot - wbw) / 2, (height - wh) / 2, wbw, wh, wbw / 2, wbw / 2);
+                ctx.fill();
+            }
+        } else {
+            // "blocks" (default): brutalist sharp thick bars, dry exaggerated peaks, centered.
+            var bbw = Math.max(2, slot * 0.7);
+            for (var bi = 0; bi < root.numBars; bi++) {
+                var bh = Math.max(2, normAt(bi, 1.45) * height);
+                ctx.fillRect(bi * slot + (slot - bbw) / 2, (height - bh) / 2, bbw, bh);
+            }
         }
     }
 }

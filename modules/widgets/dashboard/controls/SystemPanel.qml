@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell.Io
 import qs.modules.theme
 import qs.modules.components
 import qs.modules.globals
@@ -16,6 +17,31 @@ Item {
     readonly property real sideMargin: (width - contentWidth) / 2
 
     property string currentSection: ""
+
+    // ── File picker preference (yad | yazi) — read/written by ambxst-pick ─────
+    property string pickerPref: "yad"
+    function setPicker(v) {
+        root.pickerPref = v;
+        writePickerProc.command = ["sh", "-c", "mkdir -p \"$HOME/.config/ambxst\" && printf '%s' '" + v + "' > \"$HOME/.config/ambxst/filepicker\""];
+        writePickerProc.running = true;
+    }
+    Process {
+        id: readPickerProc
+        running: true
+        command: ["sh", "-c", "cat \"$HOME/.config/ambxst/filepicker\" 2>/dev/null"]
+        stdout: StdioCollector {
+            id: readPickerOut
+        }
+        onExited: code => {
+            var v = (readPickerOut.text || "").trim();
+            if (v === "yazi" || v === "yad")
+                root.pickerPref = v;
+        }
+    }
+    Process {
+        id: writePickerProc
+        running: false
+    }
 
     component SectionButton: StyledRect {
         id: sectionBtn
@@ -83,7 +109,7 @@ Item {
                     id: titlebar
                     width: root.contentWidth
                     anchors.horizontalCenter: parent.horizontalCenter
-                    title: root.currentSection === "" ? "System" : (root.currentSection === "system" ? "System Resources" : (root.currentSection.charAt(0).toUpperCase() + root.currentSection.slice(1)))
+                    title: root.currentSection === "" ? "System" : (root.currentSection === "system" ? "System Resources" : (root.currentSection === "filepicker" ? "File Picker" : (root.currentSection.charAt(0).toUpperCase() + root.currentSection.slice(1))))
                     statusText: ""
 
                     actions: {
@@ -141,6 +167,10 @@ Item {
                         SectionButton {
                             text: "Idle"
                             sectionId: "idle"
+                        }
+                        SectionButton {
+                            text: "File Picker"
+                            sectionId: "filepicker"
                         }
                     }
 
@@ -428,6 +458,50 @@ Item {
                             checked: !Config.performance.rotateCoverArt
                             onToggled: checked => {
                                 Config.performance.rotateCoverArt = !checked;
+                            }
+                        }
+
+                        // CAVA visualizer style
+                        Text {
+                            Layout.topMargin: 6
+                            text: "Visualizer style"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(0)
+                            color: Colors.overBackground
+                        }
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Repeater {
+                                model: [["blocks", "Blocks"], ["smooth", "Smooth"], ["bars", "Bars"], ["dots", "Dots"], ["waves", "Waves"]]
+
+                                delegate: StyledRect {
+                                    id: vizOpt
+                                    required property var modelData
+                                    readonly property bool active: Config.theme.cavaStyle === modelData[0]
+
+                                    implicitWidth: vizTxt.implicitWidth + 26
+                                    implicitHeight: 34
+                                    radius: Styling.radius(-2)
+                                    variant: active ? "primary" : "common"
+
+                                    Text {
+                                        id: vizTxt
+                                        anchors.centerIn: parent
+                                        text: vizOpt.modelData[1]
+                                        font.family: Config.theme.font
+                                        font.pixelSize: Styling.fontSize(0)
+                                        font.bold: vizOpt.active
+                                        color: vizOpt.active ? Styling.srItem("primary") : Colors.overBackground
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Config.theme.cavaStyle = vizOpt.modelData[0]
+                                    }
+                                }
                             }
                         }
                     }
@@ -791,6 +865,70 @@ Item {
                                     });
                                     Config.system.idle.listeners = list;
                                     GlobalStates.markShellChanged();
+                                }
+                            }
+                        }
+                    }
+
+                    // =====================
+                    // FILE PICKER SECTION
+                    // =====================
+                    ColumnLayout {
+                        visible: root.currentSection === "filepicker"
+                        property string settingsSection: "filepicker"
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Text {
+                            text: "File Picker"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.weight: Font.Medium
+                            color: Colors.overSurfaceVariant
+                            Layout.bottomMargin: -4
+                        }
+
+                        Text {
+                            text: "Dialog used when Ambxst asks you to choose a file or folder"
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            color: Colors.overSurfaceVariant
+                            opacity: 0.7
+                        }
+
+                        // Segmented chooser: yad (GUI) | yazi (TUI)
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 4
+                            spacing: 8
+
+                            Repeater {
+                                model: [["yad", "yad — GUI dialog"], ["yazi", "yazi — terminal"]]
+
+                                delegate: StyledRect {
+                                    id: pickerOpt
+                                    required property var modelData
+                                    readonly property bool active: root.pickerPref === modelData[0]
+
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 42
+                                    radius: Styling.radius(-2)
+                                    variant: active ? "primary" : "common"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: pickerOpt.modelData[1]
+                                        font.family: Config.theme.font
+                                        font.pixelSize: Styling.fontSize(0)
+                                        font.bold: pickerOpt.active
+                                        color: pickerOpt.active ? Styling.srItem("primary") : Colors.overBackground
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.setPicker(pickerOpt.modelData[0])
+                                    }
                                 }
                             }
                         }

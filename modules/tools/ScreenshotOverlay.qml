@@ -245,10 +245,14 @@ PanelWindow {
                 onTriggered: {
                     var proc = Qt.createQmlObject('import Quickshell; import Quickshell.Io; Process { }', root);
                     var src = root.imagePath;
-                    proc.command = ["bash", "-c",
-                        "dest=$(GTK_USE_PORTAL=0 zenity --file-selection --save --confirm-overwrite " +
+                    // yad es GTK3 → diálogo propio con campo de nombre editable
+                    // (zenity es GTK4 y siempre rutea al portal yazi/termfilechooser).
+                    // Vía hyprctl dispatch exec para que flote (la regla aplica a yad);
+                    // el cp va adentro (no necesitamos el stdout de vuelta).
+                    proc.command = ["hyprctl", "dispatch", "exec",
+                        "[float;center;size 950 620] dest=$(GTK_USE_PORTAL=0 yad --file --save --confirm-overwrite " +
                         "--filename=\"$(xdg-user-dir PICTURES)/Screenshots/Screenshot_$(date +%Y-%m-%d_%H-%M-%S).png\" 2>/dev/null); " +
-                        "[ -n \"$dest\" ] && cp '" + src + "' \"$dest\""];
+                        "dest=\"${dest%|}\"; [ -n \"$dest\" ] && cp '" + src + "' \"$dest\""];
                     proc.running = true;
                 }
                 StyledToolTip {
