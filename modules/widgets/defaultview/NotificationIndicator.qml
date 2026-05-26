@@ -64,13 +64,20 @@ Item {
             textFormat: Text.RichText
             font.family: Icons.font
             font.pixelSize: 18
-            color: hovered ? Styling.srItem("overprimary") : (Notifications.list.length > 0 ? Colors.error : Colors.overBackground)
+            color: hovered ? Colors.primary : (Notifications.list.length > 0 ? Colors.primary : Colors.overBackground)
 
             HoverHandler {
                 onHoveredChanged: root.hovered = hovered
             }
 
+            // Left click → open the Notifications dashboard tab (index 3).
             TapHandler {
+                acceptedButtons: Qt.LeftButton
+                onTapped: GlobalShortcuts.toggleDashboardTab(3)
+            }
+            // Right click → toggle Do Not Disturb.
+            TapHandler {
+                acceptedButtons: Qt.RightButton
                 onTapped: Notifications.silent = !Notifications.silent
             }
         }
