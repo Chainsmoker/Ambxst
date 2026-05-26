@@ -22,12 +22,24 @@ NotchAnimationBehavior {
         property int currentTab: GlobalStates.dashboardCurrentTab
     }
 
-    readonly property var tabModel: [Icons.widgets, Icons.wallpapers, Icons.heartbeat, Icons.faders]
-    readonly property int tabCount: tabModel.length
+    // Data-driven tab list — add / remove / reorder a tab by editing one entry here.
+    // `wide` tabs (launcher, equalizer) get a 600px content area; the rest get 400px.
+    // NOTE: keep the launcher at index 0 and the system/metrics tab at index 2
+    // (SystemResources gates its monitor process on dashboardCurrentTab === 2).
+    readonly property var tabs: [
+        { "icon": Icons.widgets,    "wide": true  },
+        { "icon": Icons.wallpapers, "wide": true  },
+        { "icon": Icons.cpu,        "wide": false },
+        { "icon": Icons.bell,       "wide": false },
+        { "icon": Icons.faders,     "wide": true  }
+    ]
+    // Set imperatively on completion: binding `tabs.length` on the object-array `var`
+    // trips a transient "undefined" in V4's deferred evaluation. `tabs` is constant.
+    property int tabCount: 0
     readonly property int tabSpacing: 8
 
     readonly property int tabWidth: 48
-    readonly property real nonAnimWidth: (state.currentTab === 0 || state.currentTab === 3 ? 600 : 400) + tabWidth + 16 // unified launcher and equalizer tabs are wider
+    readonly property real nonAnimWidth: ((tabs && tabs[state.currentTab] && tabs[state.currentTab].wide) ? 600 : 400) + tabWidth + 16 // wide tabs (launcher, equalizer) are 600px
 
     implicitWidth: nonAnimWidth
     implicitHeight: 430
@@ -85,6 +97,20 @@ NotchAnimationBehavior {
         }
     }
 
+    // Resolve the content Component for a tab index. Kept as a function (not in the
+    // `tabs` list) so the Component ids — declared lower in this file — are only read
+    // when called, after construction, avoiding a forward-reference undefined binding.
+    function tabComponent(i) {
+        switch (i) {
+        case 0: return unifiedLauncherComponent;
+        case 1: return wallpapersComponent;
+        case 2: return metricsComponent;
+        case 3: return notificationsComponent;
+        case 4: return equalizerComponent;
+        }
+        return null;
+    }
+
     focus: true
 
     // Usar el comportamiento estándar de animaciones del notch
@@ -92,6 +118,7 @@ NotchAnimationBehavior {
 
     // Navegar a la pestaña seleccionada cuando se abre el dashboard
     Component.onCompleted: {
+        root.tabCount = root.tabs.length;
         root.state.currentTab = GlobalStates.dashboardCurrentTab;
     }
 
@@ -189,12 +216,7 @@ NotchAnimationBehavior {
 
                 // Calcular posición Y para un índice dado
                 function getYForIndex(idx) {
-                    if (idx <= 3) {
-                        return idx * (width + root.tabSpacing);
-                    } else {
-                        // Controls button at the bottom
-                        return controlsButtonContainer.y;
-                    }
+                    return idx * (width + root.tabSpacing);
                 }
 
                 property real targetY1: getYForIndex(idx1)
@@ -234,13 +256,13 @@ NotchAnimationBehavior {
                 spacing: root.tabSpacing
 
                 Repeater {
-                    model: root.tabModel
+                    model: root.tabs
 
                     Button {
                         required property int index
-                        required property string modelData
+                        required property var modelData
 
-                        text: modelData
+                        text: modelData.icon
                         flat: true
                         width: tabsContainer.width
                         height: width
@@ -388,82 +410,55 @@ NotchAnimationBehavior {
                     }
                 }
 
-                // Generic Tab Loader Component
-                component TabLoader : Loader {
-                    anchors.fill: parent
-                    // Load based on LRU strategy or if currently active
-                    active: root.shouldTabBeLoaded(index) || root.state.currentTab === index
-                    
-                    // Visibility handles the "switching"
-                    visible: root.state.currentTab === index
-                    
-                    // Transitions
-                    opacity: visible ? 1 : 0
-                    transform: Translate {
-                        y: visible ? 0 : (root.state.currentTab > index ? -20 : 20)
-                        Behavior on y {
-                             enabled: Config.animDuration > 0
-                             NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart } 
+                // Lazy-loaded, persistent tab content — generated from root.tabs.
+                // Adding a tab to root.tabs is enough; this loads it on demand.
+                Repeater {
+                    id: contentRepeater
+                    model: root.tabs
+
+                    Loader {
+                        id: tabLoader
+                        required property int index
+                        required property var modelData
+
+                        anchors.fill: parent
+                        sourceComponent: root.tabComponent(index)
+                        z: visible ? 1 : 0
+
+                        // Load based on LRU strategy or if currently active
+                        active: root.shouldTabBeLoaded(index) || root.state.currentTab === index
+                        // Visibility handles the "switching"
+                        visible: root.state.currentTab === index
+
+                        opacity: visible ? 1 : 0
+                        transform: Translate {
+                            y: tabLoader.visible ? 0 : (root.state.currentTab > tabLoader.index ? -20 : 20)
+                            Behavior on y {
+                                enabled: Config.animDuration > 0
+                                NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart }
+                            }
+                        }
+                        Behavior on opacity {
+                            enabled: Config.animDuration > 0
+                            NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart }
+                        }
+
+                        // Forward focus to search-capable tabs (e.g. the launcher)
+                        onLoaded: {
+                            if (visible && item && item.focusSearchInput)
+                                focusUnifiedLauncherTimer.restart();
+                        }
+                        onVisibleChanged: {
+                            if (visible && item && item.focusSearchInput)
+                                focusUnifiedLauncherTimer.restart();
                         }
                     }
-
-                    Behavior on opacity {
-                        enabled: Config.animDuration > 0
-                        NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutQuart }
-                    }
-
-                    // Forward focus
-                    onLoaded: {
-                        if (visible && item && item.focusSearchInput) {
-                            focusUnifiedLauncherTimer.restart();
-                        }
-                    }
-                    
-                    // Ensure focus when becoming visible
-                    onVisibleChanged: {
-                        if (visible && item && item.focusSearchInput) {
-                            focusUnifiedLauncherTimer.restart();
-                        }
-                    }
                 }
 
-                // Tab 0: Unified Launcher
-                TabLoader {
-                    property int index: 0
-                    sourceComponent: unifiedLauncherComponent
-                    z: visible ? 1 : 0
-                }
-
-                // Tab 1: Wallpapers
-                TabLoader {
-                    property int index: 1
-                    sourceComponent: wallpapersComponent
-                    z: visible ? 1 : 0
-                }
-
-                // Tab 2: Metrics
-                TabLoader {
-                    property int index: 2
-                    sourceComponent: metricsComponent
-                    z: visible ? 1 : 0
-                }
-
-                // Tab 3: Equalizer
-                TabLoader {
-                    property int index: 3
-                    sourceComponent: equalizerComponent
-                    z: visible ? 1 : 0
-                }
-                
                 // Helper to access current item for focus
                 property var currentItem: {
-                    switch(root.state.currentTab) {
-                        case 0: return children[0].item;
-                        case 1: return children[1].item;
-                        case 2: return children[2].item;
-                        case 3: return children[3].item;
-                        default: return null;
-                    }
+                    let l = contentRepeater.itemAt(root.state.currentTab);
+                    return l ? l.item : null;
                 }
 
                 // Gesture handling para swipe vertical
@@ -586,6 +581,11 @@ NotchAnimationBehavior {
     Component {
         id: wallpapersComponent
         WallpapersTab {}
+    }
+
+    Component {
+        id: notificationsComponent
+        NotificationsTab {}
     }
 
     Component {
