@@ -61,6 +61,7 @@ QtObject {
             case "wallpaper-picker": GlobalStates.wallpaperPickerVisible = !GlobalStates.wallpaperPickerVisible; break;
             case "screenshot": Screenshot.initialize(); GlobalStates.screenshotToolVisible = true; break;
             case "screenrecord": ScreenRecorder.initialize(); GlobalStates.screenRecordToolVisible = true; break;
+            case "paint": GlobalStates.paintToolVisible = !GlobalStates.paintToolVisible; break;
             case "lens": 
                 Screenshot.initialize();
                 Screenshot.captureMode = "lens";

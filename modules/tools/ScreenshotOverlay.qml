@@ -23,21 +23,66 @@ PanelWindow {
     // Si está fijado, el preview no se auto-oculta
     property bool pinned: false
 
-    // Position: Top Right with margins
+    // Pantalla completa + máscara: el preview flota y se reposiciona por esquinas;
+    // el resto de la pantalla queda click-through.
     anchors {
-        right: true
         top: true
+        bottom: true
+        left: true
+        right: true
     }
-
-    // Width/Height handled by content + margins
-    implicitWidth: mainColumn.width + 20
-    implicitHeight: mainColumn.height + 20
 
     color: "transparent"
     visible: imagePath !== ""
+    exclusionMode: ExclusionMode.Ignore
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+    // Esquina actual del preview (persiste entre capturas)
+    property string corner: "top-right"   // top-left | top-right | bottom-left | bottom-right
+    readonly property int previewMargin: 20
+
+    function snapTo(c) {
+        const parts = c.split("-");
+        const vert = parts[0], horiz = parts[1];
+        mainColumn.x = (horiz === "left") ? previewMargin : (root.width - mainColumn.width - previewMargin);
+        mainColumn.y = (vert === "top") ? previewMargin : (root.height - mainColumn.height - previewMargin);
+    }
+
+    // Snap direccional: un flick hacia un lado manda el preview a esa esquina,
+    // conservando el eje que no se movió (flick izquierda desde arriba-derecha → arriba-izquierda).
+    function snapByDelta(dx, dy) {
+        const t = 30;
+        const parts = root.corner.split("-");
+        let vert = parts[0], horiz = parts[1];
+        if (Math.abs(dx) > t)
+            horiz = (dx < 0) ? "left" : "right";
+        if (Math.abs(dy) > t)
+            vert = (dy < 0) ? "top" : "bottom";
+        root.corner = vert + "-" + horiz;
+        root.snapTo(root.corner);
+    }
+
+    // Posiciona la primera vez sin animar, en cuanto la ventana y el contenido tienen tamaño
+    function _initPos() {
+        if (!mainColumn.ready && root.width > 0 && mainColumn.width > 0) {
+            snapTo(corner);
+            mainColumn.ready = true;
+        }
+    }
+    onWidthChanged: { _initPos(); if (mainColumn.ready && !mainColumn.dragging) snapTo(corner); }
+    onHeightChanged: { _initPos(); if (mainColumn.ready && !mainColumn.dragging) snapTo(corner); }
+
+    // Máscara: sólo el preview es interactivo; durante el drag captura todo (para no
+    // perder el cursor si se mueve rápido fuera de la caja).
+    mask: Region {
+        item: mainColumn.dragging ? dragMask : mainColumn
+    }
+    Item {
+        id: dragMask
+        anchors.fill: parent
+    }
 
     property Process copyOverlayProcess: Process {
         id: copyOverlayProcess
@@ -56,10 +101,13 @@ PanelWindow {
         onTriggered: root.imagePath = ""
     }
 
-    // MouseArea to detect hover and prevent auto-hide
+    // MouseArea to detect hover and prevent auto-hide (sólo sobre el preview)
     MouseArea {
         id: mouseAreaHover
-        anchors.fill: parent
+        x: mainColumn.x
+        y: mainColumn.y
+        width: mainColumn.width
+        height: mainColumn.height
         hoverEnabled: true
         acceptedButtons: Qt.NoButton // Pass clicks through
         propagateComposedEvents: true
@@ -89,10 +137,17 @@ PanelWindow {
 
     Column {
         id: mainColumn
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.margins: 20
         spacing: 8
+
+        property bool dragging: false
+        property bool ready: false
+
+        Behavior on x { enabled: mainColumn.ready && !mainColumn.dragging; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on y { enabled: mainColumn.ready && !mainColumn.dragging; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+        Component.onCompleted: root._initPos()
+        onWidthChanged: { root._initPos(); if (ready && !dragging) root.snapTo(root.corner); }
+        onHeightChanged: { root._initPos(); if (ready && !dragging) root.snapTo(root.corner); }
 
         // Preview Image with Drag Support — tamaño FIJO (la imagen se recorta
         // para llenar la caja, así el preview no cambia de tamaño por captura)
@@ -175,6 +230,53 @@ PanelWindow {
                         text: Icons.handGrab // Assuming this exists per user request
                         font.family: Icons.font
                         color: Colors.overBackground
+                    }
+                }
+            }
+
+            // Grip de reposición: arrastrar → snap a esquina.
+            // Separado del drag&drop de la imagen (que saca el archivo a otras apps).
+            Rectangle {
+                id: grip
+                x: 8
+                y: 8
+                z: 10
+                width: 26
+                height: 26
+                radius: Styling.radius(2)
+                color: (gripMouse.containsMouse || mainColumn.dragging) ? Colors.primary : Colors.background
+                opacity: (dragArea.containsMouse || gripMouse.containsMouse || mainColumn.dragging) ? 0.92 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: Icons.arrowsOutCardinal
+                    font.family: Icons.font
+                    font.pixelSize: 14
+                    color: (gripMouse.containsMouse || mainColumn.dragging) ? Colors.overPrimary : Colors.overBackground
+                }
+
+                MouseArea {
+                    id: gripMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.SizeAllCursor
+                    acceptedButtons: Qt.LeftButton
+                    drag.target: mainColumn
+                    drag.threshold: 0
+                    property real startX: 0
+                    property real startY: 0
+                    onPressed: {
+                        mainColumn.dragging = true;
+                        gripMouse.startX = mainColumn.x;
+                        gripMouse.startY = mainColumn.y;
+                    }
+                    onReleased: {
+                        const dx = mainColumn.x - gripMouse.startX;
+                        const dy = mainColumn.y - gripMouse.startY;
+                        mainColumn.dragging = false;
+                        root.snapByDelta(dx, dy);
                     }
                 }
             }

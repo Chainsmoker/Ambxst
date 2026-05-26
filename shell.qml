@@ -314,6 +314,20 @@ ShellRoot {
         }
     }
 
+    // Paint / annotation overlay
+    Variants {
+        model: Quickshell.screens
+
+        Loader {
+            id: paintLoader
+            active: GlobalStates.paintToolVisible
+            required property ShellScreen modelData
+            sourceComponent: PaintTool {
+                targetScreen: paintLoader.modelData
+            }
+        }
+    }
+
     // Screenshot preview overlay
     Variants {
         model: Quickshell.screens

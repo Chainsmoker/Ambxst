@@ -197,6 +197,9 @@ Singleton {
     // Screen Record Tool state
     property bool screenRecordToolVisible: false
 
+    // Paint / annotation overlay state
+    property bool paintToolVisible: false
+
     // Mirror Tool state
     property bool mirrorWindowVisible: false
 
