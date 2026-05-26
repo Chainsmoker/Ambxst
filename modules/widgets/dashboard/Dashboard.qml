@@ -25,13 +25,14 @@ NotchAnimationBehavior {
     // Data-driven tab list — add / remove / reorder a tab by editing one entry here.
     // `wide` tabs (launcher, equalizer) get a 600px content area; the rest get 400px.
     // NOTE: keep the launcher at index 0 and the system/metrics tab at index 2
-    // (SystemResources gates its monitor process on dashboardCurrentTab === 2).
+    // (SystemResources gates its monitor process on dashboardCurrentTab === 5, the cpu/metrics tab).
     readonly property var tabs: [
         { "icon": Icons.widgets,    "wide": true  },
         { "icon": Icons.wallpapers, "wide": true  },
-        { "icon": Icons.cpu,        "wide": false },
         { "icon": Icons.bell,       "wide": false },
-        { "icon": Icons.faders,     "wide": true  }
+        { "icon": Icons.faders,     "wide": true  },
+        { "icon": Icons.cube,       "wide": false },
+        { "icon": Icons.cpu,        "wide": false }
     ]
     // Set imperatively on completion: binding `tabs.length` on the object-array `var`
     // trips a transient "undefined" in V4's deferred evaluation. `tabs` is constant.
@@ -104,9 +105,10 @@ NotchAnimationBehavior {
         switch (i) {
         case 0: return unifiedLauncherComponent;
         case 1: return wallpapersComponent;
-        case 2: return metricsComponent;
-        case 3: return notificationsComponent;
-        case 4: return equalizerComponent;
+        case 2: return notificationsComponent;
+        case 3: return equalizerComponent;
+        case 4: return updatesComponent;
+        case 5: return metricsComponent;
         }
         return null;
     }
@@ -204,6 +206,36 @@ NotchAnimationBehavior {
             }
 
             // Background highlight que se desplaza verticalmente con efecto elástico
+            // Tabs scrolleables: viewport acotado entre el top y el botón de
+            // settings; auto-scroll para mantener visible el tab activo.
+            Item {
+                id: tabsViewport
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: controlsButton.top
+                anchors.bottomMargin: root.tabSpacing
+                clip: true
+
+                Item {
+                    id: tabsContent
+                    width: parent.width
+                    height: tabs.height
+                    readonly property real step: root.tabWidth + root.tabSpacing
+                    y: {
+                        var vh = tabsViewport.height;
+                        var ch = height;
+                        if (ch <= vh)
+                            return 0;
+                        var maxOff = ch - vh;
+                        var off = root.state.currentTab * step - (vh - root.tabWidth) / 2;
+                        return -Math.max(0, Math.min(maxOff, off));
+                    }
+                    Behavior on y {
+                        enabled: Config.animDuration > 0
+                        NumberAnimation { duration: Config.animDuration; easing.type: Easing.OutCubic }
+                    }
+
             StyledRect {
                 id: tabHighlight
                 variant: "primary"
@@ -296,6 +328,8 @@ NotchAnimationBehavior {
 
                         onClicked: stack.navigateToTab(index)
                     }
+                }
+            }
                 }
             }
 
@@ -591,5 +625,10 @@ NotchAnimationBehavior {
     Component {
         id: equalizerComponent
         EqualizerTab {}
+    }
+
+    Component {
+        id: updatesComponent
+        UpdatesTab {}
     }
 }
