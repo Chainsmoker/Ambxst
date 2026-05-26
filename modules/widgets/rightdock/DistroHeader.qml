@@ -13,6 +13,18 @@ Item {
     property string headerImage: ""
     property string distroName: "Linux"
     property string distroLogo: ""
+    property string hostName: ""
+
+    // HOSTNAME no se exporta al entorno (Quickshell.env lo ve null), así que
+    // corremos el comando `hostname` como hacen UserInfo/MetricsTab.
+    Process {
+        command: ["hostname"]
+        running: true
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: root.hostName = this.text.trim()
+        }
+    }
 
     readonly property string activeImage: {
         if (headerImage && headerImage.length > 0) return headerImage;
@@ -173,7 +185,7 @@ Item {
             }
 
             Text {
-                text: Quickshell.env("USER") + "@" + Quickshell.env("HOSTNAME")
+                text: Quickshell.env("USER") + "@" + root.hostName
                 color: Qt.rgba(1, 1, 1, 0.85)
                 font.family: Config.theme.monoFont
                 font.pixelSize: Styling.fontSize(-1)
