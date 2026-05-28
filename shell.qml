@@ -406,6 +406,20 @@ ShellRoot {
         }
     }
 
+    // Recording indicator (pill flotante debajo del notch mientras se graba)
+    Variants {
+        model: Quickshell.screens
+
+        Loader {
+            id: recIndicatorLoader
+            active: SuspendManager.wakeReady
+            required property ShellScreen modelData
+            sourceComponent: RecordingIndicator {
+                targetScreen: recIndicatorLoader.modelData
+            }
+        }
+    }
+
     // Init clipboard service
     Connections {
         target: ClipboardService

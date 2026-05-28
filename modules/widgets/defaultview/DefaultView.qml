@@ -66,7 +66,7 @@ Item {
     }
 
     // Computed dimensions
-    readonly property real mainRowContentWidth: 200 + userInfo.width + separator1.width + separator2.width + notifIndicator.width + (mainRow.spacing * 4) + mainRowMargin
+    readonly property real mainRowContentWidth: 200 + userInfo.width + separator1.width + separator2.width + notifIndicator.width + (recIndicator.visible ? recIndicator.width + mainRow.spacing : 0) + (mainRow.spacing * 4) + mainRowMargin
     readonly property real mainRowHeight: Config.showBackground ? (Config.notchTheme === "island" ? 36 : 44) : (Config.notchTheme === "island" ? 36 : 40)
     readonly property real notificationMinWidth: expandedState ? 420 : 320
     readonly property real notificationContainerHeight: notificationView.implicitHeight + notificationPaddingTop + notificationPaddingBottom
@@ -153,7 +153,7 @@ Item {
 
             CompactPlayer {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - userInfo.width - separator1.width - separator2.width - notifIndicator.width - (parent.spacing * 4)
+                width: parent.width - userInfo.width - separator1.width - separator2.width - notifIndicator.width - (recIndicator.visible ? recIndicator.width + parent.spacing : 0) - (parent.spacing * 4)
                 height: 32
                 player: activePlayer
                 notchHovered: expandedState
@@ -168,6 +168,40 @@ Item {
             NotificationIndicator {
                 id: notifIndicator
                 anchors.verticalCenter: parent.verticalCenter
+            }
+
+            // Indicador de grabación como ícono propio, a la derecha de la campana.
+            // Aparece sólo si grabás y ocultaste el widget flotante con la ✕.
+            // Click → reabre el widget flotante.
+            Item {
+                id: recIndicator
+                anchors.verticalCenter: parent.verticalCenter
+                implicitWidth: 24
+                implicitHeight: 24
+                visible: ScreenRecorder.isRecording && !ScreenRecorder.floatingOpen
+
+                Rectangle {
+                    id: recIndDot
+                    anchors.centerIn: parent
+                    width: 11
+                    height: 11
+                    radius: width / 2
+                    color: ScreenRecorder.paused ? Colors.outline : Colors.error
+
+                    SequentialAnimation on opacity {
+                        running: recIndicator.visible && !ScreenRecorder.paused
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.3; duration: 700; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1.0; duration: 700; easing.type: Easing.InOutSine }
+                        onStopped: recIndDot.opacity = 1
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: ScreenRecorder.floatingOpen = true
+                }
             }
         }
 

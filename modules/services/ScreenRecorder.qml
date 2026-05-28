@@ -8,7 +8,29 @@ QtObject {
     id: root
 
     property bool isRecording: false
-    property string duration: ""
+    property bool paused: false
+    // ¿Está abierta la pill flotante? Por defecto NO: al grabar sólo se ve el
+    // punto en el notch; el usuario la abre con click en el punto y la cierra
+    // con la ✕. Se resetea (cerrada) al iniciar/terminar cada grabación.
+    property bool floatingOpen: false
+    // Tiempo grabado contado INTERNAMENTE (no con `ps etime`), para poder
+    // congelarlo en pausa — gsr sigue vivo aunque esté pausado, así que su
+    // tiempo de proceso seguiría corriendo y parecería que la pausa no funciona.
+    property int elapsedSeconds: 0
+    readonly property string duration: {
+        const s = root.elapsedSeconds;
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        const pad = n => (n < 10 ? "0" : "") + n;
+        return h > 0 ? (h + ":" + pad(m) + ":" + pad(sec)) : (pad(m) + ":" + pad(sec));
+    }
+    property Timer elapsedTimer: Timer {
+        interval: 1000
+        repeat: true
+        running: root.isRecording && !root.paused && !SuspendManager.isSuspending
+        onTriggered: root.elapsedSeconds++
+    }
     property string lastError: ""
     property bool canRecordDirectly: true // Optimistic default
 
@@ -77,22 +99,13 @@ QtObject {
 
             if (root.isRecording && !wasRecording) {
                 console.log("[ScreenRecorder] Detected running instance.");
+                root.floatingOpen = false; // arranca en modo "punto en el notch"
             }
 
-            if (root.isRecording) {
-                timeProcess.running = true;
-            } else {
-                root.duration = "";
-            }
-        }
-    }
-
-    property Process timeProcess: Process {
-        id: timeProcess
-        command: ["bash", "-c", "pid=$(pgrep -f 'gpu-screen-recorder' | head -n 1); if [ -n \"$pid\" ]; then ps -o etime= -p \"$pid\"; fi"]
-        stdout: StdioCollector {
-            onTextChanged: {
-                root.duration = text.trim();
+            if (!root.isRecording) {
+                root.paused = false;
+                root.floatingOpen = false;
+                root.elapsedSeconds = 0;
             }
         }
     }
@@ -104,6 +117,23 @@ QtObject {
             // Default: Portal, no audio
             startRecording(false, false, "portal", "");
         }
+    }
+
+    // Pausa/reanuda gpu-screen-recorder con SIGUSR2 (toggle). El contador
+    // interno (elapsedTimer) se congela porque deja de correr con `paused`.
+    function togglePause() {
+        if (!isRecording)
+            return;
+        pauseProcess.running = true;
+        paused = !paused;
+    }
+
+    // Patrón anclado (^) como recomienda el man de gpu-screen-recorder: apunta
+    // sólo al proceso del grabador, no a wrappers ni a otros procesos que
+    // contengan "gpu-screen-recorder" en su línea de comando.
+    property Process pauseProcess: Process {
+        id: pauseProcess
+        command: ["pkill", "-SIGUSR2", "-f", "^gpu-screen-recorder"]
     }
 
     function startRecording(recordAudioOutput, recordAudioInput, mode, regionStr) {
@@ -151,9 +181,13 @@ QtObject {
         id: prepareProcess
         command: ["mkdir", "-p", root.videosDir]
         onExited: exitCode => {
-            notifyStartProcess.running = true;
+            // notifyStartProcess suprimido: el indicador animado bajo el notch
+            // (RecordingIndicator.qml) reemplaza la notificación de inicio.
             startProcess.running = true;
             root.isRecording = true;
+            root.paused = false;
+            root.floatingOpen = false; // arranca oculta: sólo el punto en el notch
+            root.elapsedSeconds = 0;
         }
     }
 
