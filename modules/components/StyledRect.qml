@@ -211,15 +211,17 @@ ClippingRectangle {
     layer.enabled: enableShadow
     layer.effect: Shadow {}
 
-    // Sheen glossy opcional: brillo blanco sutil arriba que se desvanece, +
-    // una sombra muy leve abajo → look "gel/vidrio". Clipeado por el root.
+    // Sheen plata/satinado opcional: brillo concentrado en el centro que se
+    // difumina hacia los bordes (look metálico). Clipeado por el root.
     Rectangle {
         anchors.fill: parent
         visible: root.glossy
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.16) }
-            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.0) }
-            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.07) }
+            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.02) }
+            GradientStop { position: 0.42; color: Qt.rgba(1, 1, 1, 0.26) }
+            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.30) }
+            GradientStop { position: 0.58; color: Qt.rgba(1, 1, 1, 0.26) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.06) }
         }
     }
 
