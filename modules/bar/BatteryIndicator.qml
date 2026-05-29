@@ -53,6 +53,8 @@ Item {
         id: buttonBg
         variant: root.popupOpen ? "primary" : "bg"
         glossy: true
+        fillColor: Colors.inverseSurface
+        item: Colors.inverseOnSurface
         anchors.fill: parent
         enableShadow: root.layerEnabled
 
@@ -159,7 +161,7 @@ Item {
             text: Battery.available ? (Battery.isPluggedIn ? Icons.plug : Icons.lightning) : PowerProfile.getProfileIcon(PowerProfile.currentProfile)
             font.family: Icons.font
             font.pixelSize: Battery.available ? 14 : 18
-            color: root.popupOpen ? buttonBg.item : Colors.overBackground
+            color: buttonBg.item
 
             Behavior on color {
                 enabled: Config.animDuration > 0

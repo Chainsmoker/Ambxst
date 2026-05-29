@@ -600,6 +600,8 @@ Item {
                         PresetsButton {
                             id: presetsButton
                             glossy: true
+                            fillColor: Colors.inverseSurface
+                            contentColor: Colors.inverseOnSurface
                             startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
@@ -608,6 +610,8 @@ Item {
                         ToolsButton {
                             id: toolsButton
                             glossy: true
+                            fillColor: Colors.inverseSurface
+                            contentColor: Colors.inverseOnSurface
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
@@ -647,6 +651,8 @@ Item {
                         PowerButton {
                             id: powerButton
                             glossy: true
+                            fillColor: Colors.inverseSurface
+                            contentColor: Colors.inverseOnSurface
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             enableShadow: root.shadowsEnabled

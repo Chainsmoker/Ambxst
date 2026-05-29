@@ -42,6 +42,8 @@ Item {
         id: buttonBg
         variant: root.popupOpen ? "primary" : "bg"
         glossy: true
+        fillColor: Colors.inverseSurface
+        item: Colors.inverseOnSurface
         anchors.fill: parent
         enableShadow: root.layerEnabled
 
@@ -69,7 +71,7 @@ Item {
             text: Icons.faders
             font.family: Icons.font
             font.pixelSize: 18
-            color: root.popupOpen ? buttonBg.item : Styling.srItem("overprimary")
+            color: buttonBg.item
         }
 
         MouseArea {

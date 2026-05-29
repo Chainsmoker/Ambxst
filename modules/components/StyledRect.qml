@@ -17,6 +17,7 @@ ClippingRectangle {
     property bool enableShadow: false
     property bool enableBorder: true
     property bool glossy: false   // sheen tipo gel/vidrio (brillo arriba que se desvanece)
+    property color fillColor: "transparent"   // override del color de fondo (chips claros, etc.)
     property bool animateRadius: true
     property real backgroundOpacity: -1  // -1 means use config value
 
@@ -97,6 +98,9 @@ ClippingRectangle {
     // Color priority: single-color gradient > explicit solid color > transparent (for real gradients)
     // Apply rectOpacity via alpha channel to avoid affecting children
     color: {
+        if (fillColor.a > 0) {
+            return applyOpacity(fillColor, rectOpacity);
+        }
         if (isSingleColorGradient && (gradientType === "linear" || gradientType === "radial")) {
             return applyOpacity(singleGradientColor, rectOpacity);
         }

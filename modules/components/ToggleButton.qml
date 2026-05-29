@@ -18,6 +18,8 @@ Button {
     property int iconSize: 18
     property bool enableShadow: true
     property bool glossy: false
+    property color fillColor: "transparent"      // override del fondo (chips claros)
+    property color contentColor: "transparent"   // color del ícono si fillColor es claro
     // Radius handling
     property real radius: 0
     property bool vertical: false // Set by parent if needed, or inferred? ToggleButton doesn't know orientation usually.
@@ -35,6 +37,7 @@ Button {
         id: bg
         variant: "bg"
         glossy: root.glossy
+        fillColor: root.fillColor
         enableShadow: root.enableShadow && Config.showBackground
 
         // Map start/end to corners based on vertical property
@@ -67,7 +70,7 @@ Button {
             textFormat: Text.RichText
             font.family: Icons.font
             font.pixelSize: 18
-            color: root.pressed ? Colors.background : (Styling.srItem("overprimary") || Colors.foreground)
+            color: root.pressed ? Colors.background : (root.contentColor.a > 0 ? root.contentColor : (Styling.srItem("overprimary") || Colors.foreground))
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
