@@ -16,6 +16,7 @@ ClippingRectangle {
     property string gradientOrientation: "vertical"
     property bool enableShadow: false
     property bool enableBorder: true
+    property bool glossy: false   // sheen tipo gel/vidrio (brillo arriba que se desvanece)
     property bool animateRadius: true
     property real backgroundOpacity: -1  // -1 means use config value
 
@@ -205,6 +206,18 @@ ClippingRectangle {
     // Shadow effect
     layer.enabled: enableShadow
     layer.effect: Shadow {}
+
+    // Sheen glossy opcional: brillo blanco sutil arriba que se desvanece, +
+    // una sombra muy leve abajo → look "gel/vidrio". Clipeado por el root.
+    Rectangle {
+        anchors.fill: parent
+        visible: root.glossy
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.16) }
+            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.0) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.07) }
+        }
+    }
 
     // Border overlay to avoid ClippingRectangle artifacts
     ClippingRectangle {

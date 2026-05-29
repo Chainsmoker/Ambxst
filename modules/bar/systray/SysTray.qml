@@ -6,6 +6,7 @@ import qs.modules.components
 
     StyledRect {
     variant: "bg"
+    glossy: true
     id: root
 
     // Hide when no tray items

@@ -52,6 +52,7 @@ Item {
     StyledRect {
         id: buttonBg
         variant: root.popupOpen ? "primary" : "bg"
+        glossy: true
         anchors.fill: parent
         enableShadow: root.layerEnabled
 

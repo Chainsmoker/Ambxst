@@ -599,6 +599,7 @@ Item {
 
                         PresetsButton {
                             id: presetsButton
+                            glossy: true
                             startRadius: root.dockAtEnd ? root.innerRadius : root.outerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
@@ -606,6 +607,7 @@ Item {
 
                         ToolsButton {
                             id: toolsButton
+                            glossy: true
                             startRadius: root.innerRadius
                             endRadius: root.innerRadius
                             enableShadow: root.shadowsEnabled
@@ -644,6 +646,7 @@ Item {
 
                         PowerButton {
                             id: powerButton
+                            glossy: true
                             startRadius: root.innerRadius
                             endRadius: root.outerRadius
                             enableShadow: root.shadowsEnabled

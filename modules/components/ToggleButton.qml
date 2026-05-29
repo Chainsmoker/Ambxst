@@ -17,6 +17,7 @@ Button {
     property bool iconFullTint: false
     property int iconSize: 18
     property bool enableShadow: true
+    property bool glossy: false
     // Radius handling
     property real radius: 0
     property bool vertical: false // Set by parent if needed, or inferred? ToggleButton doesn't know orientation usually.
@@ -33,6 +34,7 @@ Button {
     background: StyledRect {
         id: bg
         variant: "bg"
+        glossy: root.glossy
         enableShadow: root.enableShadow && Config.showBackground
 
         // Map start/end to corners based on vertical property
