@@ -224,6 +224,43 @@ def _opencve_score(detail):
             return 2.5
     return None
 
+VULNCHECK_API = "https://api.vulncheck.com/v3"
+
+def _vulncheck_token():
+    """Token de VulnCheck. $VULNCHECK_TOKEN o ~/.config/ambxst/vulncheck.token.
+    Opcional: si falta, se omite el enriquecimiento de exploits (no es error)."""
+    tok = os.environ.get("VULNCHECK_TOKEN", "").strip()
+    if tok:
+        return tok
+    cfg = os.path.expanduser(os.environ.get("XDG_CONFIG_HOME", "~/.config"))
+    try:
+        with open(os.path.join(cfg, "ambxst", "vulncheck.token")) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+def _vulncheck_kev(cve_id, token):
+    """Exploit intel de VulnCheck para un CVE: presencia en KEV (más amplio que
+    el de CISA), nº de exploits/PoC públicos + link, y uso en ransomware.
+    Devuelve {} si no hay token o el CVE no está en su KEV."""
+    if not token:
+        return {}
+    try:
+        resp = fetch_json_auth(f"{VULNCHECK_API}/index/vulncheck-kev?cve={cve_id}", token)
+    except Exception:
+        return {}
+    docs = resp.get("data") or []
+    if not docs:
+        return {}
+    doc = docs[0]
+    xdb = doc.get("vulncheck_xdb") or []
+    return {
+        "kev": True,
+        "exploits": len(xdb),
+        "exploitUrl": xdb[0].get("xdb_url", "") if xdb else "",
+        "ransomware": str(doc.get("knownRansomwareCampaignUse", "")).strip().lower() == "known",
+    }
+
 def get_cves():
     """Fetch latest CVEs from OpenCVE (app.opencve.io).
 
@@ -240,6 +277,7 @@ def get_cves():
 
     listing = fetch_json_auth(f"{OPENCVE_API}/cve", token)
     results = listing.get("results", []) if isinstance(listing, dict) else []
+    vc_token = _vulncheck_token()
 
     def enrich(item):
         cve_id = item.get("cve_id", "CVE-Unknown")
@@ -247,12 +285,23 @@ def get_cves():
         if len(description) > 200:
             description = description[:200] + "..."
 
+        # OpenCVE: CVSS + EPSS (prob. de explotación) + KEV de CISA.
         score_val = None
+        epss_score = None
+        cisa_kev = False
         try:
             detail = fetch_json_auth(f"{OPENCVE_API}/cve/{cve_id}", token)
             score_val = _opencve_score(detail)
+            metrics = detail.get("metrics", {}) or {}
+            es = ((metrics.get("epss") or {}).get("data") or {}).get("score")
+            if es is not None:
+                epss_score = float(es)
+            cisa_kev = bool(((metrics.get("kev") or {}).get("data")) or {})
         except Exception:
             pass
+
+        # VulnCheck: KEV ampliado + exploits/PoC públicos + ransomware.
+        vc = _vulncheck_kev(cve_id, vc_token)
 
         severity, color, score_str = _cve_severity(score_val)
         cve_url = (f"https://nvd.nist.gov/vuln/detail/{cve_id}"
@@ -264,6 +313,11 @@ def get_cves():
             "color": color,
             "description": description,
             "url": cve_url,
+            "epss": f"{epss_score * 100:.1f}%" if epss_score is not None else "",
+            "kev": bool(cisa_kev or vc.get("kev")),
+            "exploits": int(vc.get("exploits", 0)),
+            "exploitUrl": vc.get("exploitUrl", ""),
+            "ransomware": bool(vc.get("ransomware")),
         }
 
     with ThreadPoolExecutor(max_workers=8) as ex:

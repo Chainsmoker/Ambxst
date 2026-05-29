@@ -589,6 +589,105 @@ PanelWindow {
                                         Layout.rightMargin: 14
                                     }
 
+                                    // Intel de explotación: KEV / ransomware / PoC / EPSS
+                                    Flow {
+                                        Layout.fillWidth: true
+                                        Layout.leftMargin: 14
+                                        Layout.rightMargin: 14
+                                        spacing: 6
+                                        visible: cveCard.modelData.kev === true
+                                                 || (cveCard.modelData.exploits || 0) > 0
+                                                 || cveCard.modelData.ransomware === true
+                                                 || ("" + (cveCard.modelData.epss || "")).length > 0
+
+                                        // EXPLOITED (KEV) — explotación confirmada en el mundo real
+                                        Rectangle {
+                                            visible: cveCard.modelData.kev === true
+                                            height: 18
+                                            width: kevTxt.implicitWidth + 14
+                                            radius: 3
+                                            color: Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.16)
+                                            border.width: 1
+                                            border.color: Colors.error
+                                            Text {
+                                                id: kevTxt
+                                                anchors.centerIn: parent
+                                                text: "EXPLOITED"
+                                                color: Colors.error
+                                                font.family: Config.theme.monoFont
+                                                font.pixelSize: Styling.monoFontSize(-2)
+                                                font.weight: Font.Bold
+                                                font.letterSpacing: 0.5
+                                            }
+                                        }
+
+                                        // RANSOMWARE
+                                        Rectangle {
+                                            visible: cveCard.modelData.ransomware === true
+                                            height: 18
+                                            width: ransTxt.implicitWidth + 14
+                                            radius: 3
+                                            color: Qt.rgba(Colors.error.r, Colors.error.g, Colors.error.b, 0.16)
+                                            border.width: 1
+                                            border.color: Colors.error
+                                            Text {
+                                                id: ransTxt
+                                                anchors.centerIn: parent
+                                                text: "RANSOMWARE"
+                                                color: Colors.error
+                                                font.family: Config.theme.monoFont
+                                                font.pixelSize: Styling.monoFontSize(-2)
+                                                font.weight: Font.Bold
+                                                font.letterSpacing: 0.5
+                                            }
+                                        }
+
+                                        // Exploits / PoC públicos (VulnCheck) — clicable al exploit
+                                        Rectangle {
+                                            visible: (cveCard.modelData.exploits || 0) > 0
+                                            height: 18
+                                            width: pocTxt.implicitWidth + 14
+                                            radius: 3
+                                            color: Qt.rgba(Colors.tertiary.r, Colors.tertiary.g, Colors.tertiary.b, 0.16)
+                                            border.width: 1
+                                            border.color: Colors.tertiary
+                                            Text {
+                                                id: pocTxt
+                                                anchors.centerIn: parent
+                                                text: (cveCard.modelData.exploits || 0) + " PoC"
+                                                color: Colors.tertiary
+                                                font.family: Config.theme.monoFont
+                                                font.pixelSize: Styling.monoFontSize(-2)
+                                                font.weight: Font.Bold
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                enabled: ("" + (cveCard.modelData.exploitUrl || "")).length > 0
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: Qt.openUrlExternally(cveCard.modelData.exploitUrl)
+                                            }
+                                        }
+
+                                        // EPSS — probabilidad de explotación (próximos 30 días)
+                                        Rectangle {
+                                            visible: ("" + (cveCard.modelData.epss || "")).length > 0
+                                            height: 18
+                                            width: epssTxt.implicitWidth + 14
+                                            radius: 3
+                                            color: "transparent"
+                                            border.width: 1
+                                            border.color: Colors.outline
+                                            Text {
+                                                id: epssTxt
+                                                anchors.centerIn: parent
+                                                text: "EPSS " + cveCard.modelData.epss
+                                                color: Colors.outline
+                                                font.family: Config.theme.monoFont
+                                                font.pixelSize: Styling.monoFontSize(-2)
+                                            }
+                                        }
+                                    }
+
                                     // Descripción
                                     Text {
                                         text: cveCard.modelData.description
