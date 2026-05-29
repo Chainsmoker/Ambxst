@@ -161,137 +161,113 @@ def get_tech_news():
         })
     return formatted
 
-def get_cves():
-    """Fetch latest CVEs from CIRCL vulnerability database."""
-    url = "https://cve.circl.lu/api/last"
-    raw_data = fetch_json(url)
-    
-    formatted = []
-    for item in raw_data:
-        if "document" in item:
-            # CSAF Document format (e.g. Red Hat Advisories)
-            doc = item["document"]
-            cve_id = doc.get("tracking", {}).get("id") or "Advisory"
-            
-            # Find description in notes
-            description = ""
-            notes = doc.get("notes", [])
-            for note in notes:
-                if note.get("category") in ("summary", "general"):
-                    text = note.get("text", "")
-                    if text:
-                        description = text
-                        break
-            if not description and doc.get("title"):
-                description = doc.get("title")
-            if not description:
-                description = "Red Hat Security Advisory."
-                
-            # Truncate description if too long
-            if len(description) > 200:
-                description = description[:200] + "..."
-                
-            # Determine score from aggregate_severity
-            sev_text = doc.get("aggregate_severity", {}).get("text", "").lower()
-            if "critical" in sev_text:
-                score_val = 9.5
-            elif "important" in sev_text or "high" in sev_text:
-                score_val = 8.0
-            elif "moderate" in sev_text or "medium" in sev_text:
-                score_val = 5.5
-            elif "low" in sev_text:
-                score_val = 2.5
-            else:
-                score_val = 5.0
-        elif "cveMetadata" in item:
-            # CVE v5 format (New standard from CIRCL API)
-            metadata = item["cveMetadata"]
-            cve_id = metadata.get("cveId") or "CVE-Unknown"
-            
-            # Find description
-            description = "No description provided."
-            cna = item.get("containers", {}).get("cna", {})
-            descriptions = cna.get("descriptions", [])
-            for desc in descriptions:
-                if desc.get("lang") == "en" and desc.get("value"):
-                    description = desc.get("value")
-                    break
-            if description == "No description provided." and descriptions:
-                description = descriptions[0].get("value") or description
-                
-            if len(description) > 200:
-                description = description[:200] + "..."
-                
-            # Find CVSS score
-            score_val = None
-            metrics = cna.get("metrics", [])
-            for metric in metrics:
-                for cvss_key in ["cvssV4_0", "cvssV3_1", "cvssV3_0", "cvssV2_0"]:
-                    if cvss_key in metric:
-                        val = metric[cvss_key].get("baseScore")
-                        if val is not None:
-                            try:
-                                score_val = float(val)
-                                break
-                            except ValueError:
-                                pass
-                if score_val is not None:
-                    break
-            
-            if score_val is None:
-                score_val = 5.0
-        else:
-            # Standard OSV/CVE format
-            cve_id = item.get("id", "CVE-Unknown")
-            description = item.get("summary") or item.get("details") or "No description provided."
-            if len(description) > 200:
-                description = description[:200] + "..."
-                
-            score_val = item.get("cvss")
-            if score_val is None:
-                score_val = 5.0
-            else:
-                try:
-                    score_val = float(score_val)
-                except ValueError:
-                    score_val = 5.0
-                    
-        if score_val >= 9.0:
-            severity = "CRITICAL"
-            color = "#E07556"
-        elif score_val >= 7.0:
-            severity = "HIGH"
-            color = "#ff8a4a"
-        elif score_val >= 4.0:
-            severity = "MEDIUM"
-            color = "#ffe57a"
-        elif score_val > 0.0:
-            severity = "LOW"
-            color = "#7f8fa6"
-        else:
-            severity = "UNKNOWN"
-            color = "#7f8fa6"
-            
-        cve_url = ""
-        cve_upper = cve_id.upper()
-        if cve_upper.startswith("CVE-"):
-            cve_url = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
-        elif cve_upper.startswith("RHSA-") or cve_upper.startswith("RHBA-") or cve_upper.startswith("RHEA-"):
-            cve_url = f"https://access.redhat.com/errata/{cve_id}"
-        elif cve_upper.startswith("GHSA-"):
-            cve_url = f"https://github.com/advisories/{cve_id}"
-        elif cve_upper.startswith("MAL-"):
-            cve_url = f"https://osv.dev/vulnerability/{cve_id}"
+OPENCVE_API = "https://app.opencve.io/api"
 
-        formatted.append({
+def _opencve_token():
+    """Token de OpenCVE. Se lee de $OPENCVE_TOKEN o del archivo
+    $XDG_CONFIG_HOME/ambxst/opencve.token. NO se commitea (es un secreto)."""
+    tok = os.environ.get("OPENCVE_TOKEN", "").strip()
+    if tok:
+        return tok
+    cfg = os.path.expanduser(os.environ.get("XDG_CONFIG_HOME", "~/.config"))
+    try:
+        with open(os.path.join(cfg, "ambxst", "opencve.token")) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+def fetch_json_auth(url, token):
+    """Fetch JSON con Authorization: Bearer (para la API de OpenCVE)."""
+    req = urllib.request.Request(url, headers={
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    })
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+def _cve_severity(score_val):
+    """Mapea un CVSS score (o None) a (severity, color, score_str)."""
+    if score_val is None:
+        return "UNKNOWN", "#7f8fa6", "—"
+    if score_val >= 9.0:
+        return "CRITICAL", "#E07556", f"{score_val:.1f}"
+    if score_val >= 7.0:
+        return "HIGH", "#ff8a4a", f"{score_val:.1f}"
+    if score_val >= 4.0:
+        return "MEDIUM", "#ffe57a", f"{score_val:.1f}"
+    if score_val > 0.0:
+        return "LOW", "#7f8fa6", f"{score_val:.1f}"
+    return "UNKNOWN", "#7f8fa6", "—"
+
+def _opencve_score(detail):
+    """Mejor CVSS disponible del detalle de OpenCVE; fallback a threat_severity."""
+    metrics = detail.get("metrics", {}) or {}
+    for key in ("cvssV4_0", "cvssV3_1", "cvssV3_0", "cvssV2_0"):
+        data = (metrics.get(key) or {}).get("data") or {}
+        s = data.get("score")
+        if s is not None:
+            try:
+                return float(s)
+            except (ValueError, TypeError):
+                pass
+    ts = (metrics.get("threat_severity") or {}).get("data")
+    if isinstance(ts, str):
+        t = ts.lower()
+        if "critical" in t:
+            return 9.5
+        if "important" in t or "high" in t:
+            return 8.0
+        if "moderate" in t or "medium" in t:
+            return 5.5
+        if "low" in t:
+            return 2.5
+    return None
+
+def get_cves():
+    """Fetch latest CVEs from OpenCVE (app.opencve.io).
+
+    La lista (página 1 = más recientes por updated_at) sólo trae id/descripción,
+    así que pedimos el detalle de cada CVE EN PARALELO para sacar el CVSS real.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    token = _opencve_token()
+    if not token:
+        raise RuntimeError(
+            "OpenCVE token not configured "
+            "(set $OPENCVE_TOKEN or ~/.config/ambxst/opencve.token)")
+
+    listing = fetch_json_auth(f"{OPENCVE_API}/cve", token)
+    results = listing.get("results", []) if isinstance(listing, dict) else []
+
+    def enrich(item):
+        cve_id = item.get("cve_id", "CVE-Unknown")
+        description = item.get("description") or "No description provided."
+        if len(description) > 200:
+            description = description[:200] + "..."
+
+        score_val = None
+        try:
+            detail = fetch_json_auth(f"{OPENCVE_API}/cve/{cve_id}", token)
+            score_val = _opencve_score(detail)
+        except Exception:
+            pass
+
+        severity, color, score_str = _cve_severity(score_val)
+        cve_url = (f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+                   if cve_id.upper().startswith("CVE-") else "")
+        return {
             "cve": cve_id,
             "severity": severity,
-            "score": f"{score_val:.1f}",
+            "score": score_str,
             "color": color,
             "description": description,
-            "url": cve_url
-        })
-    return formatted
+            "url": cve_url,
+        }
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        return list(ex.map(enrich, results))
 
 def get_reddit_posts():
     """Fetch latest tech posts from r/technology on Reddit."""
