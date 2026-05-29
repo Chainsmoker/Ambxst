@@ -162,6 +162,7 @@ def get_tech_news():
     return formatted
 
 OPENCVE_API = "https://app.opencve.io/api"
+CVE_PAGES = 3   # OpenCVE pagina de a 10 → 3 páginas ≈ 30 CVEs (como el feed viejo)
 
 def _opencve_token():
     """Token de OpenCVE. Se lee de $OPENCVE_TOKEN o del archivo
@@ -275,8 +276,17 @@ def get_cves():
             "OpenCVE token not configured "
             "(set $OPENCVE_TOKEN or ~/.config/ambxst/opencve.token)")
 
-    listing = fetch_json_auth(f"{OPENCVE_API}/cve", token)
-    results = listing.get("results", []) if isinstance(listing, dict) else []
+    # OpenCVE pagina de a 10; juntamos varias páginas para un feed más largo.
+    results = []
+    for page in range(1, CVE_PAGES + 1):
+        try:
+            listing = fetch_json_auth(f"{OPENCVE_API}/cve?page={page}", token)
+        except Exception:
+            break
+        page_results = listing.get("results", []) if isinstance(listing, dict) else []
+        if not page_results:
+            break
+        results.extend(page_results)
     vc_token = _vulncheck_token()
 
     def enrich(item):
