@@ -38,15 +38,15 @@ Rectangle {
     })
 
     Component.onCompleted: {
-        EasyEffectsService.initialize();
-        EasyEffectsService.checkRouting();
+        PwEqService.initialize();
+        PwEqService.checkRouting();
         // Restaurar la selección previa si el usuario ya tocó el EQ en esta
         // sesión (el tab se destruye al cambiar de pestaña). Si no, arrancar en
         // Flat sin auto-aplicar (no pisar el EQ actual sólo por abrir el tab).
-        if (EasyEffectsService.uiPreset !== "" && EasyEffectsService.uiBands.length === 10) {
-            setBands(EasyEffectsService.uiBands);
-            activePreset = EasyEffectsService.uiPreset;
-            pending = EasyEffectsService.uiPending;
+        if (PwEqService.uiPreset !== "" && PwEqService.uiBands.length === 10) {
+            setBands(PwEqService.uiBands);
+            activePreset = PwEqService.uiPreset;
+            pending = PwEqService.uiPending;
         } else {
             setBands(presets["Flat"]);
             activePreset = "Flat";
@@ -56,9 +56,9 @@ Rectangle {
 
     // Espeja el estado de UI al singleton para que sobreviva a la recarga del tab.
     function saveUiState() {
-        EasyEffectsService.uiPreset = root.activePreset;
-        EasyEffectsService.uiBands = root.bands.slice();
-        EasyEffectsService.uiPending = root.pending;
+        PwEqService.uiPreset = root.activePreset;
+        PwEqService.uiBands = root.bands.slice();
+        PwEqService.uiPending = root.pending;
     }
 
     function setBands(arr) {
@@ -70,8 +70,8 @@ Rectangle {
 
     // Commit the current curve to EasyEffects + fire the lightning strike
     function commit() {
-        if (EasyEffectsService.available)
-            EasyEffectsService.applyEqualizer(root.bands);
+        if (PwEqService.available)
+            PwEqService.applyEqualizer(root.bands);
         root.pending = false;
         root.saveUiState();
         root.triggerEqLightning();
@@ -159,7 +159,7 @@ Rectangle {
                     color: Colors.primary
                 }
                 Text {
-                    text: EasyEffectsService.available ? (EasyEffectsService.bypassed ? "Bypassed" : "PipeWire · EasyEffects active") : "EasyEffects not running"
+                    text: PwEqService.available ? (PwEqService.bypassed ? "Bypassed" : "PipeWire EQ active") : "PipeWire EQ not loaded"
                     font.family: Config.theme.monoFont
                     font.pixelSize: Styling.monoFontSize(-1)
                     color: Colors.overBackground
@@ -207,15 +207,15 @@ Rectangle {
                 Layout.preferredHeight: 28
                 Layout.preferredWidth: bypassTxt.implicitWidth + 24
                 radius: Styling.radius(3)
-                color: !EasyEffectsService.bypassed ? Colors.surfaceContainer : Colors.surfaceContainerHigh
+                color: !PwEqService.bypassed ? Colors.surfaceContainer : Colors.surfaceContainerHigh
                 border.width: 1
                 border.color: Colors.outline
-                opacity: EasyEffectsService.available ? 1 : 0.4
+                opacity: PwEqService.available ? 1 : 0.4
 
                 Text {
                     id: bypassTxt
                     anchors.centerIn: parent
-                    text: EasyEffectsService.bypassed ? "Enable" : "Bypass"
+                    text: PwEqService.bypassed ? "Enable" : "Bypass"
                     font.family: Config.theme.monoFont
                     font.pixelSize: Styling.monoFontSize(-1)
                     font.bold: true
@@ -224,9 +224,9 @@ Rectangle {
 
                 MouseArea {
                     anchors.fill: parent
-                    enabled: EasyEffectsService.available
+                    enabled: PwEqService.available
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: EasyEffectsService.toggleBypass()
+                    onClicked: PwEqService.toggleBypass()
                 }
             }
 
@@ -293,7 +293,7 @@ Rectangle {
             id: routingBanner
             Layout.fillWidth: true
             Layout.preferredHeight: 40
-            visible: EasyEffectsService.available && !EasyEffectsService.audioRouted
+            visible: PwEqService.available && !PwEqService.audioRouted
             radius: Styling.radius(3)
             color: Qt.rgba(Colors.tertiary.r, Colors.tertiary.g, Colors.tertiary.b, 0.12)
             border.width: 1
@@ -314,7 +314,7 @@ Rectangle {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "El audio no pasa por EasyEffects — el EQ no se oye"
+                    text: "Audio isn't routed through the EQ — sound is unaffected"
                     font.family: Config.theme.monoFont
                     font.pixelSize: Styling.monoFontSize(-1)
                     color: Colors.overBackground
@@ -340,7 +340,7 @@ Rectangle {
                         }
                         Text {
                             id: routeTxt
-                            text: "Enrutar"
+                            text: "Route"
                             font.family: Config.theme.monoFont
                             font.pixelSize: Styling.monoFontSize(-1)
                             font.bold: true
@@ -353,7 +353,7 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: EasyEffectsService.routeThroughEE()
+                        onClicked: PwEqService.routeThroughEE()
                     }
                 }
             }

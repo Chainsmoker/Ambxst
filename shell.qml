@@ -449,6 +449,9 @@ ShellRoot {
         onTriggered: {
             let _ = NightLightService.active;
             _ = GameModeService.toggled;
+            // Re-aplica la curva del ecualizador persistida (el filter-chain de
+            // PipeWire arranca en 0 tras cada reinicio).
+            PwEqService.initialize();
         }
     }
 }
