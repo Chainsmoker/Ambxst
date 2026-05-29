@@ -7,7 +7,7 @@ import qs.modules.components
     StyledRect {
     variant: "bg"
     glossy: true
-    fillColor: Colors.inverseSurface
+    fillColor: Colors.surfaceBright
     id: root
 
     // Hide when no tray items

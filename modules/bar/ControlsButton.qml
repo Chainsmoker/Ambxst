@@ -42,8 +42,8 @@ Item {
         id: buttonBg
         variant: root.popupOpen ? "primary" : "bg"
         glossy: true
-        fillColor: Colors.inverseSurface
-        item: Colors.inverseOnSurface
+        fillColor: Colors.surfaceBright
+        item: Colors.overBackground
         anchors.fill: parent
         enableShadow: root.layerEnabled
 
