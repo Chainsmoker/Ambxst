@@ -40,26 +40,46 @@ Item {
         path: "/etc/os-release"
         onLoaded: {
             const lines = text().split("\n");
-            let pretty = "", id = "";
+            let pretty = "", id = "", logo = "", idLike = "";
+            const val = line => line.split("=").slice(1).join("=").replace(/^"|"$/g, "");
             for (let line of lines) {
-                if (line.startsWith("PRETTY_NAME="))
-                    pretty = line.split("=")[1].replace(/^"|"$/g, "");
-                else if (line.startsWith("ID="))
-                    id = line.split("=")[1].replace(/^"|"$/g, "");
+                if (line.startsWith("PRETTY_NAME=")) pretty = val(line);
+                else if (line.startsWith("ID=")) id = val(line);
+                else if (line.startsWith("ID_LIKE=")) idLike = val(line);
+                else if (line.startsWith("LOGO=")) logo = val(line);
             }
             if (pretty) root.distroName = pretty;
-            if (id) {
-                // Probar logo en /usr/share/pixmaps
-                const candidates = [
-                    "/usr/share/pixmaps/" + id + "-logo.svg",
-                    "/usr/share/pixmaps/" + id + ".svg",
-                    "/usr/share/pixmaps/" + id + "-logo.png",
-                    "/usr/share/pixmaps/" + id + ".png"
-                ];
-                logoCheck.candidates = candidates;
-                logoCheck.idx = 0;
-                logoCheck.tryNext();
-            }
+
+            // Nombres a probar, en orden de preferencia: LOGO (campo estándar de
+            // os-release, p.ej. CachyOS define LOGO=cachyos) → ID → cada token de
+            // ID_LIKE (deriva al logo del padre: cachyos/archcraft → arch) →
+            // genérico freedesktop.
+            const names = [];
+            const push = n => { if (n && names.indexOf(n) < 0) names.push(n); };
+            push(logo);
+            push(id);
+            for (const l of idLike.split(/\s+/)) push(l);
+            push("distributor-logo");
+
+            // Dónde: pixmaps + icon themes (CachyOS instala su icono en hicolor,
+            // no en pixmaps con ese nombre).
+            const bases = [
+                "/usr/share/pixmaps/",
+                "/usr/share/icons/hicolor/scalable/apps/",
+                "/usr/share/icons/hicolor/256x256/apps/",
+                "/usr/share/icons/hicolor/128x128/apps/"
+            ];
+            const suffixes = ["-logo.svg", ".svg", "-logo.png", ".png"];
+
+            const candidates = [];
+            for (const n of names)
+                for (const b of bases)
+                    for (const s of suffixes)
+                        candidates.push(b + n + s);
+
+            logoCheck.candidates = candidates;
+            logoCheck.idx = 0;
+            logoCheck.tryNext();
         }
     }
 
