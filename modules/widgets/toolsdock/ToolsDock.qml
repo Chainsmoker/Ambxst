@@ -187,6 +187,35 @@ PanelWindow {
         return "Expires In " + Math.floor(hours / 24) + "d";
     }
 
+    // Parte un mensaje markdown en segmentos prosa/código (por fences ```).
+    function msgSegments(text) {
+        var t = text || "";
+        var segs = [];
+        var parts = t.split("```");
+        for (var i = 0; i < parts.length; i++) {
+            if (i % 2 === 0) {
+                if (parts[i].trim().length > 0)
+                    segs.push({ code: false, lang: "", body: parts[i].trim() });
+            } else {
+                var p = parts[i];
+                var nl = p.indexOf("\n");
+                var lang = "";
+                var body = p;
+                if (nl >= 0) {
+                    var first = p.substring(0, nl).trim();
+                    if (first.length > 0 && first.indexOf(" ") === -1 && first.length < 20) {
+                        lang = first;
+                        body = p.substring(nl + 1);
+                    }
+                }
+                segs.push({ code: true, lang: lang, body: body.replace(/\n+$/, "") });
+            }
+        }
+        if (segs.length === 0)
+            segs.push({ code: false, lang: "", body: t });
+        return segs;
+    }
+
     // Password coloreado por tipo de carácter (RichText): mayús/números/símbolos/minús.
     function pwColored() {
         var pw = PasswordService.password;
@@ -605,78 +634,224 @@ PanelWindow {
                     required property int index
 
                     readonly property bool isUser: modelData.role === "user"
-                    readonly property real maxBubble: ListView.view ? ListView.view.width * 0.84 : 300
                     readonly property bool isStreaming: !isUser && Ai.isLoading && index === Ai.currentChat.length - 1
                     readonly property bool isEmpty: (modelData.content || "").length === 0
 
                     width: ListView.view ? ListView.view.width : 0
-                    height: bubble.height + roleLbl.implicitHeight + 7
+                    height: (msgItem.isUser ? userCol.implicitHeight : asstRow.implicitHeight) + 6
 
-                    StyledRect {
-                        id: bubble
-                        anchors.left: msgItem.isUser ? undefined : parent.left
-                        anchors.right: msgItem.isUser ? parent.right : undefined
-                        width: (msgItem.isStreaming && msgItem.isEmpty) ? 64 : (bubbleText.width + 24)
-                        height: (msgItem.isStreaming && msgItem.isEmpty) ? 38 : (bubbleText.height + 22)
-                        radius: Styling.radius(2)
-                        variant: msgItem.isUser ? "primary" : "pane"
+                    // ===== USER: burbuja a la derecha =====
+                    Column {
+                        id: userCol
+                        visible: msgItem.isUser
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        spacing: 3
 
-                        // Indicador de "escribiendo" mientras streamea sin contenido
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 5
-                            visible: msgItem.isStreaming && msgItem.isEmpty
+                        StyledRect {
+                            anchors.right: parent.right
+                            width: Math.min(uText.implicitWidth + 24, msgItem.width * 0.82)
+                            height: uText.implicitHeight + 20
+                            radius: Styling.radius(2)
+                            variant: "primary"
+                            TextEdit {
+                                id: uText
+                                x: 12
+                                y: 10
+                                width: Math.min(implicitWidth, msgItem.width * 0.82 - 24)
+                                readOnly: true
+                                selectByMouse: true
+                                wrapMode: TextEdit.Wrap
+                                text: msgItem.modelData.content || ""
+                                color: Styling.srItem("primary")
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(0)
+                            }
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 4
+                            text: "You"
+                            color: Colors.outline
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-3)
+                        }
+                    }
+
+                    // ===== ASSISTANT: avatar + nombre + segmentos =====
+                    Row {
+                        id: asstRow
+                        visible: !msgItem.isUser
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        spacing: 9
+
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: 14
+                            color: Colors.primaryContainer
+                            Text {
+                                anchors.centerIn: parent
+                                text: Icons.robot
+                                font.family: Icons.font
+                                font.pixelSize: 15
+                                color: Colors.overPrimaryContainer
+                            }
+                        }
+
+                        Column {
+                            width: msgItem.width - 28 - 9
+                            spacing: 6
+
+                            Text {
+                                text: msgItem.modelData.model || "Hermes"
+                                color: Colors.primary
+                                font.family: Config.theme.font
+                                font.weight: Font.Bold
+                                font.pixelSize: Styling.fontSize(-2)
+                            }
+
+                            // Indicador de escritura (streaming sin contenido)
+                            Row {
+                                spacing: 5
+                                visible: msgItem.isStreaming && msgItem.isEmpty
+                                Repeater {
+                                    model: 3
+                                    delegate: Rectangle {
+                                        required property int index
+                                        width: 7
+                                        height: 7
+                                        radius: 3.5
+                                        color: Colors.outline
+                                        SequentialAnimation on opacity {
+                                            loops: Animation.Infinite
+                                            running: msgItem.isStreaming && msgItem.isEmpty
+                                            PauseAnimation { duration: index * 160 }
+                                            NumberAnimation { from: 1.0; to: 0.25; duration: 350 }
+                                            NumberAnimation { from: 0.25; to: 1.0; duration: 350 }
+                                            PauseAnimation { duration: (2 - index) * 160 }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Segmentos: prosa (markdown) + bloques de código
                             Repeater {
-                                model: 3
-                                delegate: Rectangle {
-                                    required property int index
-                                    width: 7
-                                    height: 7
-                                    radius: 3.5
-                                    color: Styling.srItem("pane")
-                                    SequentialAnimation on opacity {
-                                        loops: Animation.Infinite
-                                        running: msgItem.isStreaming && msgItem.isEmpty
-                                        PauseAnimation { duration: index * 160 }
-                                        NumberAnimation { from: 1.0; to: 0.25; duration: 350 }
-                                        NumberAnimation { from: 0.25; to: 1.0; duration: 350 }
-                                        PauseAnimation { duration: (2 - index) * 160 }
+                                model: (msgItem.isStreaming && msgItem.isEmpty) ? [] : dock.msgSegments(msgItem.modelData.content)
+                                delegate: Loader {
+                                    required property var modelData
+                                    width: parent ? parent.width : 0
+                                    sourceComponent: modelData.code ? codeSeg : proseSeg
+
+                                    Component {
+                                        id: proseSeg
+                                        TextEdit {
+                                            width: parent.width
+                                            readOnly: true
+                                            selectByMouse: true
+                                            wrapMode: TextEdit.Wrap
+                                            textFormat: TextEdit.MarkdownText
+                                            text: modelData.body
+                                            color: Colors.overBackground
+                                            font.family: Config.theme.font
+                                            font.pixelSize: Styling.fontSize(0)
+                                            onLinkActivated: l => Qt.openUrlExternally(l)
+                                        }
+                                    }
+
+                                    Component {
+                                        id: codeSeg
+                                        Rectangle {
+                                            id: codeBox
+                                            property bool cdCopied: false
+                                            width: parent.width
+                                            height: cdHeader.height + cdText.implicitHeight + 20
+                                            radius: Styling.radius(-4)
+                                            color: Colors.surfaceContainerLowest
+                                            clip: true
+
+                                            Timer { id: cdCopyTimer; interval: 1300; onTriggered: codeBox.cdCopied = false }
+
+                                            Rectangle {
+                                                id: cdHeader
+                                                anchors.top: parent.top
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                height: 28
+                                                color: Colors.surfaceContainerHighest
+                                                Text {
+                                                    anchors.left: parent.left
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.leftMargin: 12
+                                                    text: modelData.lang !== "" ? modelData.lang : "code"
+                                                    font.family: Config.theme.monoFont
+                                                    font.pixelSize: Styling.fontSize(-3)
+                                                    color: Colors.outline
+                                                }
+                                                Rectangle {
+                                                    anchors.right: parent.right
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.rightMargin: 5
+                                                    width: cdCopyRow.implicitWidth + 14
+                                                    height: 22
+                                                    radius: height / 2
+                                                    color: cdCopyMouse.containsMouse ? Colors.primary : "transparent"
+                                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                                    Row {
+                                                        id: cdCopyRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 5
+                                                        Text {
+                                                            text: codeBox.cdCopied ? Icons.accept : Icons.copy
+                                                            font.family: Icons.font
+                                                            font.pixelSize: 11
+                                                            color: codeBox.cdCopied ? Colors.primary : (cdCopyMouse.containsMouse ? Colors.overPrimary : Colors.outline)
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                        }
+                                                        Text {
+                                                            text: codeBox.cdCopied ? "Copied" : "Copy"
+                                                            font.family: Config.theme.font
+                                                            font.pixelSize: Styling.fontSize(-3)
+                                                            color: codeBox.cdCopied ? Colors.primary : (cdCopyMouse.containsMouse ? Colors.overPrimary : Colors.outline)
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: cdCopyMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            dock.copyNoteText(modelData.body);
+                                                            codeBox.cdCopied = true;
+                                                            cdCopyTimer.restart();
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            TextEdit {
+                                                id: cdText
+                                                anchors.top: cdHeader.bottom
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.margins: 10
+                                                width: parent.width - 20
+                                                readOnly: true
+                                                selectByMouse: true
+                                                wrapMode: TextEdit.WrapAnywhere
+                                                text: modelData.body
+                                                color: Colors.overBackground
+                                                font.family: Config.theme.monoFont
+                                                font.pixelSize: Styling.fontSize(-1)
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-
-                        TextEdit {
-                            id: bubbleText
-                            visible: !(msgItem.isStreaming && msgItem.isEmpty)
-                            x: 12
-                            y: 11
-                            width: Math.min(implicitWidth, msgItem.maxBubble - 24)
-                            readOnly: true
-                            selectByMouse: true
-                            wrapMode: TextEdit.Wrap
-                            textFormat: msgItem.isUser ? TextEdit.PlainText : TextEdit.MarkdownText
-                            text: msgItem.modelData.content || ""
-                            color: msgItem.isUser ? Styling.srItem("primary") : Styling.srItem("pane")
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(0)
-                            onLinkActivated: l => Qt.openUrlExternally(l)
-                        }
-                    }
-
-                    Text {
-                        id: roleLbl
-                        anchors.top: bubble.bottom
-                        anchors.topMargin: 3
-                        anchors.left: msgItem.isUser ? undefined : parent.left
-                        anchors.right: msgItem.isUser ? parent.right : undefined
-                        anchors.leftMargin: 4
-                        anchors.rightMargin: 4
-                        text: msgItem.isUser ? "You" : (msgItem.modelData.model || "Hermes")
-                        color: Colors.outline
-                        font.family: Config.theme.font
-                        font.capitalization: Font.Capitalize
-                        font.pixelSize: Styling.fontSize(-3)
                     }
                 }
             }
