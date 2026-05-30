@@ -94,6 +94,17 @@ Singleton {
         root._save();
     }
 
+    // Edita el texto de una nota (mantiene su expiración).
+    function update(id, text) {
+        const t = (text || "").trim();
+        if (t.length === 0)
+            return;
+        root.notes = root.notes.map(function (n) {
+            return n.id === id ? { id: n.id, text: t, createdAt: n.createdAt, expiresAt: n.expiresAt } : n;
+        });
+        root._save();
+    }
+
     function clear() {
         root.notes = [];
         root._save();

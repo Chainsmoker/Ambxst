@@ -154,10 +154,15 @@ PanelWindow {
     property int notesTtlIndex: NotesService.defaultTtlIndex
     property bool ttlMenuOpen: false
     property double notesNow: Date.now()
+    property string notesEditingId: ""
 
     // --- Translator state ---
     property int trLangIndex: TranslatorService.defaultLangIndex
     property bool trLangMenuOpen: false
+    property bool trCopied: false
+
+    // --- Dev Tools state ---
+    property string devLastOp: ""
 
     Process { id: notesCopyProc; running: false }
 
@@ -180,6 +185,28 @@ PanelWindow {
         if (hours < 24)
             return "Expires In " + hours + "h";
         return "Expires In " + Math.floor(hours / 24) + "d";
+    }
+
+    // Password coloreado por tipo de carácter (RichText): mayús/números/símbolos/minús.
+    function pwColored() {
+        var pw = PasswordService.password;
+        if (!pw)
+            return "";
+        var up = Colors.primary.toString();
+        var dg = Colors.tertiary.toString();
+        var sy = Colors.error.toString();
+        var lo = Colors.overBackground.toString();
+        var out = "";
+        for (var i = 0; i < pw.length; i++) {
+            var c = pw.charAt(i);
+            var col = lo;
+            if (c >= "A" && c <= "Z") col = up;
+            else if (c >= "0" && c <= "9") col = dg;
+            else if (!(c >= "a" && c <= "z")) col = sy;
+            var e = c === "<" ? "&lt;" : (c === ">" ? "&gt;" : (c === "&" ? "&amp;" : c));
+            out += "<span style=\"color:" + col + "\">" + e + "</span>";
+        }
+        return out;
     }
 
     Item {
@@ -295,32 +322,6 @@ PanelWindow {
                 Behavior on width { NumberAnimation { duration: Config.animDuration > 0 ? Config.animDuration : 250; easing.type: Easing.OutCubic } }
             }
 
-            // Cerrar (X) — botón circular suave
-            Rectangle {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                width: 38
-                height: 38
-                radius: width / 2
-                color: closeMouse.containsMouse ? Colors.surfaceContainerHigh : "transparent"
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: Icons.cancel
-                    font.family: Icons.font
-                    font.pixelSize: 16
-                    color: Colors.overBackground
-                }
-
-                MouseArea {
-                    id: closeMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: GlobalStates.toolsDockOpen = false
-                }
-            }
         }
 
         // Separador tenue
@@ -424,8 +425,8 @@ PanelWindow {
 
                 Repeater {
                     model: [
-                        { t: "Conversación", i: 0 },
-                        { t: "Historial", i: 1 }
+                        { t: "Conversation", i: 0 },
+                        { t: "History", i: 1 }
                     ]
                     delegate: Rectangle {
                         id: subChip
@@ -536,9 +537,9 @@ PanelWindow {
 
                     Repeater {
                         model: [
-                            { text: "Saludá", prompt: "Hola! Contame qué podés hacer." },
-                            { text: "¿Qué sos?", prompt: "Hola, explicame qué es Ambxst shell." },
-                            { text: "Limpiar", action: "clear" }
+                            { text: "Say Hi", prompt: "Hi! Tell me what you can do." },
+                            { text: "What Are You?", prompt: "Hi, explain what Ambxst shell is." },
+                            { text: "Clear", action: "clear" }
                         ]
 
                         delegate: Rectangle {
@@ -671,7 +672,7 @@ PanelWindow {
                         anchors.right: msgItem.isUser ? parent.right : undefined
                         anchors.leftMargin: 4
                         anchors.rightMargin: 4
-                        text: msgItem.isUser ? "Tú" : (msgItem.modelData.model || "Hermes")
+                        text: msgItem.isUser ? "You" : (msgItem.modelData.model || "Hermes")
                         color: Colors.outline
                         font.family: Config.theme.font
                         font.capitalization: Font.Capitalize
@@ -750,7 +751,7 @@ PanelWindow {
                                 Text {
                                     anchors.fill: parent
                                     verticalAlignment: Text.AlignVCenter
-                                    text: "Preguntale algo a Ambxst..."
+                                    text: "Ask Ambxst something..."
                                     color: Colors.outline
                                     opacity: chatInput.text.length === 0 ? 0.7 : 0
                                     font: chatInput.font
@@ -829,9 +830,9 @@ PanelWindow {
 
                     Repeater {
                         model: [
-                            { cmd: "/new", desc: "Nuevo chat", instant: true },
-                            { cmd: "/model", desc: "Cambiar o listar modelos", instant: false },
-                            { cmd: "/help", desc: "Ayuda y comandos", instant: true }
+                            { cmd: "/new", desc: "New chat", instant: true },
+                            { cmd: "/model", desc: "Switch or list models", instant: false },
+                            { cmd: "/help", desc: "Help and commands", instant: true }
                         ]
                         delegate: Rectangle {
                             required property var modelData
@@ -998,7 +999,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Sin Conversaciones"
+                    text: "No Conversations"
                     font.family: Config.theme.font
                     font.capitalization: Font.Capitalize
                     font.pixelSize: Styling.fontSize(0)
@@ -1063,7 +1064,7 @@ PanelWindow {
                             Text {
                                 anchors.fill: parent
                                 verticalAlignment: Text.AlignVCenter
-                                text: "Buscar en el portapapeles..."
+                                text: "Search clipboard..."
                                 color: Colors.outline
                                 opacity: clipSearchInput.text.length === 0 ? 0.7 : 0
                                 font: clipSearchInput.font
@@ -1114,7 +1115,7 @@ PanelWindow {
 
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: dock.clipSearch.length > 0 ? "Sin Resultados" : "Portapapeles Vacío"
+                    text: dock.clipSearch.length > 0 ? "No Results" : "Clipboard Empty"
                     font.family: Config.theme.font
                     font.capitalization: Font.Capitalize
                     font.pixelSize: Styling.fontSize(0)
@@ -1264,6 +1265,9 @@ PanelWindow {
                 height: 96
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
+                border.width: dock.notesEditingId !== "" ? 2 : 0
+                border.color: Colors.primary
+                Behavior on border.width { NumberAnimation { duration: 150 } }
 
                 Flickable {
                     anchors.fill: parent
@@ -1279,7 +1283,7 @@ PanelWindow {
                         padding: 0
                         background: null
                         color: Colors.overBackground
-                        placeholderText: "Pegá o escribí una nota..."
+                        placeholderText: "Paste or write a note..."
                         placeholderTextColor: Colors.outline
                         font.family: Config.theme.font
                         font.pixelSize: Styling.fontSize(0)
@@ -1309,85 +1313,154 @@ PanelWindow {
                     id: noteCard
                     required property var modelData
                     required property int index
+                    readonly property bool editing: dock.notesEditingId === modelData.id
+                    property bool copied: false
 
                     width: ListView.view.width
-                    height: noteCol.implicitHeight + 24
+                    height: noteCol.implicitHeight + 26
                     radius: Styling.radius(2)
-                    color: noteMouse.containsMouse ? Colors.primaryContainer : Colors.surfaceContainerHigh
+                    color: noteCard.editing ? Colors.primaryContainer : (cardHover.hovered ? Colors.surfaceContainerHighest : Colors.surfaceContainerHigh)
                     Behavior on color { ColorAnimation { duration: 150 } }
 
-                    MouseArea {
-                        id: noteMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: dock.copyNoteText(noteCard.modelData.text)
-                    }
+                    HoverHandler { id: cardHover }
+                    Timer { id: copyResetTimer; interval: 1300; onTriggered: noteCard.copied = false }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
+                    ColumnLayout {
+                        id: noteCol
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 13
                         spacing: 10
 
-                        ColumnLayout {
-                            id: noteCol
+                        // Texto de la nota
+                        Text {
                             Layout.fillWidth: true
-                            spacing: 5
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: noteCard.modelData.text
-                                color: noteMouse.containsMouse ? Colors.overPrimaryContainer : Colors.overBackground
-                                font.family: Config.theme.font
-                                font.pixelSize: Styling.fontSize(-1)
-                                wrapMode: Text.WordWrap
-                                maximumLineCount: 3
-                                elide: Text.ElideRight
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
-                                Text {
-                                    text: Icons.timer
-                                    font.family: Icons.font
-                                    font.pixelSize: 12
-                                    color: noteMouse.containsMouse ? Colors.overPrimaryContainer : Colors.outline
-                                }
-                                Text {
-                                    text: dock.noteTimeLabel(noteCard.modelData)
-                                    font.family: Config.theme.font
-                                    font.capitalization: Font.Capitalize
-                                    font.pixelSize: Styling.fontSize(-3)
-                                    color: noteMouse.containsMouse ? Colors.overPrimaryContainer : Colors.outline
-                                }
-                            }
+                            text: noteCard.modelData.text
+                            color: noteCard.editing ? Colors.overPrimaryContainer : Colors.overBackground
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(0)
+                            lineHeight: 1.15
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 4
+                            elide: Text.ElideRight
                         }
 
-                        // Borrar
-                        Rectangle {
-                            Layout.preferredWidth: 34
-                            Layout.preferredHeight: 34
-                            Layout.alignment: Qt.AlignTop
-                            radius: width / 2
-                            color: noteDelMouse.containsMouse ? Colors.error : "transparent"
-                            opacity: noteMouse.containsMouse || noteDelMouse.containsMouse ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                        // Footer: chip de expiración + acciones
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: Icons.trash
-                                font.family: Icons.font
-                                font.pixelSize: 14
-                                color: noteDelMouse.containsMouse ? Colors.background : Colors.overPrimaryContainer
+                            Rectangle {
+                                Layout.preferredHeight: 24
+                                Layout.preferredWidth: expRow.implicitWidth + 18
+                                radius: height / 2
+                                color: noteCard.editing ? Qt.rgba(Colors.overPrimaryContainer.r, Colors.overPrimaryContainer.g, Colors.overPrimaryContainer.b, 0.15) : Colors.surfaceContainerHighest
+                                Row {
+                                    id: expRow
+                                    anchors.centerIn: parent
+                                    spacing: 5
+                                    Text {
+                                        text: Icons.timer
+                                        font.family: Icons.font
+                                        font.pixelSize: 11
+                                        color: noteCard.editing ? Colors.overPrimaryContainer : Colors.outline
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    Text {
+                                        text: dock.noteTimeLabel(noteCard.modelData)
+                                        font.family: Config.theme.font
+                                        font.capitalization: Font.Capitalize
+                                        font.pixelSize: Styling.fontSize(-3)
+                                        color: noteCard.editing ? Colors.overPrimaryContainer : Colors.outline
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                }
                             }
-                            MouseArea {
-                                id: noteDelMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: NotesService.remove(noteCard.modelData.id)
+
+                            Item { Layout.fillWidth: true }
+
+                            // Copiar (con feedback)
+                            Rectangle {
+                                Layout.preferredWidth: 30
+                                Layout.preferredHeight: 30
+                                radius: Styling.radius(-6)
+                                color: copyBtnMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: noteCard.copied ? Icons.accept : Icons.copy
+                                    font.family: Icons.font
+                                    font.pixelSize: 13
+                                    color: noteCard.copied ? Colors.primary : (copyBtnMouse.containsMouse ? Colors.overPrimary : Colors.overBackground)
+                                }
+                                MouseArea {
+                                    id: copyBtnMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        dock.copyNoteText(noteCard.modelData.text);
+                                        noteCard.copied = true;
+                                        copyResetTimer.restart();
+                                    }
+                                }
+                            }
+
+                            // Editar
+                            Rectangle {
+                                Layout.preferredWidth: 30
+                                Layout.preferredHeight: 30
+                                radius: Styling.radius(-6)
+                                color: editBtnMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Icons.edit
+                                    font.family: Icons.font
+                                    font.pixelSize: 13
+                                    color: editBtnMouse.containsMouse ? Colors.overPrimary : Colors.overBackground
+                                }
+                                MouseArea {
+                                    id: editBtnMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        noteInput.text = noteCard.modelData.text;
+                                        dock.notesEditingId = noteCard.modelData.id;
+                                        noteInput.forceActiveFocus();
+                                    }
+                                }
+                            }
+
+                            // Borrar
+                            Rectangle {
+                                Layout.preferredWidth: 30
+                                Layout.preferredHeight: 30
+                                radius: Styling.radius(-6)
+                                color: delBtnMouse.containsMouse ? Colors.error : Colors.surfaceContainerHighest
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Icons.trash
+                                    font.family: Icons.font
+                                    font.pixelSize: 13
+                                    color: delBtnMouse.containsMouse ? Colors.background : Colors.overBackground
+                                }
+                                MouseArea {
+                                    id: delBtnMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (dock.notesEditingId === noteCard.modelData.id) {
+                                            dock.notesEditingId = "";
+                                            noteInput.text = "";
+                                        }
+                                        NotesService.remove(noteCard.modelData.id);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1411,7 +1484,7 @@ PanelWindow {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Sin Notas"
+                    text: "No Notes"
                     font.family: Config.theme.font
                     font.capitalization: Font.Capitalize
                     font.pixelSize: Styling.fontSize(0)
@@ -1483,7 +1556,34 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Guardar
+                // Cancelar edición
+                Rectangle {
+                    visible: dock.notesEditingId !== ""
+                    Layout.preferredHeight: 44
+                    Layout.preferredWidth: 44
+                    radius: height / 2
+                    color: cancelMouse.containsMouse ? Colors.surfaceContainerHighest : Colors.surfaceContainerHigh
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Text {
+                        anchors.centerIn: parent
+                        text: Icons.cancel
+                        font.family: Icons.font
+                        font.pixelSize: 15
+                        color: Colors.overBackground
+                    }
+                    MouseArea {
+                        id: cancelMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            dock.notesEditingId = "";
+                            noteInput.text = "";
+                        }
+                    }
+                }
+
+                // Guardar / Actualizar
                 Rectangle {
                     Layout.preferredHeight: 44
                     Layout.preferredWidth: saveRow.implicitWidth + 28
@@ -1496,14 +1596,14 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 8
                         Text {
-                            text: Icons.plus
+                            text: dock.notesEditingId !== "" ? Icons.accept : Icons.plus
                             font.family: Icons.font
                             font.pixelSize: 15
                             color: noteInput.text.trim() !== "" ? Colors.overPrimary : Colors.outline
                             anchors.verticalCenter: parent.verticalCenter
                         }
                         Text {
-                            text: "Guardar"
+                            text: dock.notesEditingId !== "" ? "Update" : "Save"
                             font.family: Config.theme.font
                             font.capitalization: Font.Capitalize
                             font.pixelSize: Styling.fontSize(-1)
@@ -1517,12 +1617,17 @@ PanelWindow {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            if (noteInput.text.trim() !== "") {
+                            if (noteInput.text.trim() === "")
+                                return;
+                            if (dock.notesEditingId !== "") {
+                                NotesService.update(dock.notesEditingId, noteInput.text);
+                                dock.notesEditingId = "";
+                            } else {
                                 NotesService.add(noteInput.text, NotesService.ttlPresets[dock.notesTtlIndex].ms);
-                                noteInput.text = "";
-                                dock.ttlMenuOpen = false;
-                                dock.notesNow = Date.now();
                             }
+                            noteInput.text = "";
+                            dock.ttlMenuOpen = false;
+                            dock.notesNow = Date.now();
                         }
                     }
                 }
@@ -1618,7 +1723,7 @@ PanelWindow {
             anchors.bottom: parent.bottom
             visible: dock.currentTab === 3
 
-            // Texto de origen
+            // Panel de origen
             Rectangle {
                 id: srcBox
                 anchors.top: parent.top
@@ -1626,13 +1731,14 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
-                height: 108
+                height: 112
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
 
                 Flickable {
                     anchors.fill: parent
                     anchors.margins: 14
+                    anchors.bottomMargin: 30
                     clip: true
                     contentHeight: srcInput.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
@@ -1644,19 +1750,62 @@ PanelWindow {
                         padding: 0
                         background: null
                         color: Colors.overBackground
-                        placeholderText: "Texto a traducir..."
+                        placeholderText: "Text to translate..."
                         placeholderTextColor: Colors.outline
                         font.family: Config.theme.font
                         font.pixelSize: Styling.fontSize(0)
                         selectByMouse: true
                     }
                 }
+
+                // Contador de caracteres
+                Text {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 14
+                    anchors.bottomMargin: 9
+                    visible: srcInput.text.length > 0
+                    text: srcInput.text.length + " chars"
+                    font.family: Config.theme.monoFont
+                    font.pixelSize: Styling.fontSize(-3)
+                    color: Colors.outline
+                }
+
+                // Limpiar origen
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 7
+                    width: 26
+                    height: 26
+                    radius: width / 2
+                    visible: srcInput.text.length > 0
+                    color: srcClearMouse.containsMouse ? Colors.surfaceContainerHighest : "transparent"
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Text {
+                        anchors.centerIn: parent
+                        text: Icons.cancel
+                        font.family: Icons.font
+                        font.pixelSize: 12
+                        color: Colors.outline
+                    }
+                    MouseArea {
+                        id: srcClearMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            srcInput.text = "";
+                            TranslatorService.clear();
+                        }
+                    }
+                }
             }
 
-            // Salida (declarada antes que los controles para que el dropdown la solape)
+            // Panel de salida — header (idioma destino + copiar) + cuerpo
             Rectangle {
                 id: outBox
-                anchors.top: trControlsRow.bottom
+                anchors.top: translateBtn.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
@@ -1666,189 +1815,89 @@ PanelWindow {
                 anchors.bottomMargin: 16
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
+                clip: true
 
-                // Cargando
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 10
-                    visible: TranslatorService.loading
-                    Text {
-                        text: Icons.circleNotch
-                        font.family: Icons.font
-                        font.pixelSize: 20
-                        color: Colors.primary
-                        RotationAnimation on rotation {
-                            running: TranslatorService.loading
-                            loops: Animation.Infinite
-                            from: 0
-                            to: 360
-                            duration: 900
-                        }
-                    }
-                    Text {
-                        text: "Traduciendo..."
-                        font.family: Config.theme.font
-                        font.capitalization: Font.Capitalize
-                        font.pixelSize: Styling.fontSize(-1)
-                        color: Colors.outline
-                    }
-                }
+                Timer { id: trCopyTimer; interval: 1300; onTriggered: dock.trCopied = false }
 
-                // Error / sin key
-                Text {
-                    anchors.fill: parent
-                    anchors.margins: 18
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    visible: !TranslatorService.loading && TranslatorService.error !== ""
-                    text: TranslatorService.error
-                    color: Colors.error
-                    font.family: Config.theme.font
-                    font.pixelSize: Styling.fontSize(-1)
-                    wrapMode: Text.WordWrap
-                }
-
-                // Placeholder
-                Text {
-                    anchors.centerIn: parent
-                    visible: !TranslatorService.loading && TranslatorService.error === "" && TranslatorService.output === ""
-                    text: "La Traducción Aparece Acá"
-                    color: Colors.outline
-                    font.family: Config.theme.font
-                    font.capitalization: Font.Capitalize
-                    font.pixelSize: Styling.fontSize(-1)
-                }
-
-                // Resultado
-                Flickable {
-                    anchors.fill: parent
-                    anchors.margins: 14
-                    anchors.rightMargin: 46
-                    clip: true
-                    visible: !TranslatorService.loading && TranslatorService.output !== ""
-                    contentHeight: outText.implicitHeight
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    TextEdit {
-                        id: outText
-                        width: parent.width
-                        readOnly: true
-                        selectByMouse: true
-                        wrapMode: TextEdit.Wrap
-                        text: TranslatorService.output
-                        color: Colors.overBackground
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(0)
-                    }
-                }
-
-                // Copiar
+                // Header: idioma destino + copiar
                 Rectangle {
+                    id: outHeader
                     anchors.top: parent.top
+                    anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.margins: 8
-                    width: 32
-                    height: 32
-                    radius: width / 2
-                    visible: TranslatorService.output !== "" && !TranslatorService.loading
-                    color: outCopyMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    height: 38
+                    color: Colors.surfaceContainerHighest
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: Icons.copy
-                        font.family: Icons.font
-                        font.pixelSize: 14
-                        color: outCopyMouse.containsMouse ? Colors.overPrimary : Colors.overBackground
-                    }
-                    MouseArea {
-                        id: outCopyMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: dock.copyNoteText(TranslatorService.output)
-                    }
-                }
-            }
-
-            // Controles: idioma destino + traducir (al final → el popup solapa la salida)
-            RowLayout {
-                id: trControlsRow
-                anchors.top: srcBox.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: dock.hPadding
-                anchors.rightMargin: dock.hPadding
-                anchors.topMargin: 10
-                height: 44
-                spacing: 8
-                z: 50
-
-                // Selector de idioma
-                Rectangle {
-                    id: trLangButton
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 44
-                    radius: height / 2
-                    color: trLangMouse.containsMouse || dock.trLangMenuOpen ? Colors.surfaceContainerHighest : Colors.surfaceContainerHigh
-                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 14
-                        spacing: 8
+                    Row {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 14
+                        spacing: 7
                         Text {
                             text: Icons.globe
                             font.family: Icons.font
-                            font.pixelSize: 15
+                            font.pixelSize: 14
                             color: Colors.primary
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                         Text {
-                            Layout.fillWidth: true
                             text: TranslatorService.languages[dock.trLangIndex].label
                             font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Medium
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.weight: Font.Bold
                             color: Colors.overBackground
-                            elide: Text.ElideRight
+                            anchors.verticalCenter: parent.verticalCenter
                         }
+                    }
+
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 6
+                        width: 28
+                        height: 28
+                        radius: width / 2
+                        visible: TranslatorService.output !== "" && !TranslatorService.loading
+                        color: outCopyMouse.containsMouse ? Colors.primary : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
                         Text {
-                            text: dock.trLangMenuOpen ? Icons.caretUp : Icons.caretDown
+                            anchors.centerIn: parent
+                            text: dock.trCopied ? Icons.accept : Icons.copy
                             font.family: Icons.font
-                            font.pixelSize: 12
-                            color: Colors.outline
+                            font.pixelSize: 13
+                            color: dock.trCopied ? Colors.primary : (outCopyMouse.containsMouse ? Colors.overPrimary : Colors.overBackground)
+                        }
+                        MouseArea {
+                            id: outCopyMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                dock.copyNoteText(TranslatorService.output);
+                                dock.trCopied = true;
+                                trCopyTimer.restart();
+                            }
                         }
                     }
-
-                    MouseArea {
-                        id: trLangMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: dock.trLangMenuOpen = !dock.trLangMenuOpen
-                    }
-
                 }
 
-                // Traducir
-                Rectangle {
-                    Layout.preferredHeight: 44
-                    Layout.preferredWidth: trRow.implicitWidth + 28
-                    radius: height / 2
-                    color: (srcInput.text.trim() !== "" && !TranslatorService.loading) ? Colors.primary : Colors.surfaceContainerHigh
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                // Cuerpo: estados
+                Item {
+                    anchors.top: outHeader.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
 
-                    Row {
-                        id: trRow
+                    // Cargando
+                    RowLayout {
                         anchors.centerIn: parent
-                        spacing: 8
+                        spacing: 10
+                        visible: TranslatorService.loading
                         Text {
-                            text: TranslatorService.loading ? Icons.circleNotch : Icons.globe
+                            text: Icons.circleNotch
                             font.family: Icons.font
-                            font.pixelSize: 15
-                            color: (srcInput.text.trim() !== "" && !TranslatorService.loading) ? Colors.overPrimary : Colors.outline
-                            anchors.verticalCenter: parent.verticalCenter
+                            font.pixelSize: 20
+                            color: Colors.primary
                             RotationAnimation on rotation {
                                 running: TranslatorService.loading
                                 loops: Animation.Infinite
@@ -1858,104 +1907,174 @@ PanelWindow {
                             }
                         }
                         Text {
-                            text: "Traducir"
+                            text: "Translating..."
                             font.family: Config.theme.font
                             font.capitalization: Font.Capitalize
                             font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Bold
-                            color: (srcInput.text.trim() !== "" && !TranslatorService.loading) ? Colors.overPrimary : Colors.outline
-                            anchors.verticalCenter: parent.verticalCenter
+                            color: Colors.outline
                         }
                     }
 
-                    MouseArea {
+                    // Error / sin key
+                    Text {
                         anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (srcInput.text.trim() !== "" && !TranslatorService.loading) {
-                                dock.trLangMenuOpen = false;
-                                TranslatorService.translate(srcInput.text, TranslatorService.languages[dock.trLangIndex].label);
-                            }
+                        anchors.margins: 18
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        visible: !TranslatorService.loading && TranslatorService.error !== ""
+                        text: TranslatorService.error
+                        color: Colors.error
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-1)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    // Placeholder
+                    Text {
+                        anchors.centerIn: parent
+                        visible: !TranslatorService.loading && TranslatorService.error === "" && TranslatorService.output === ""
+                        text: "Translation Appears Here"
+                        color: Colors.outline
+                        font.family: Config.theme.font
+                        font.capitalization: Font.Capitalize
+                        font.pixelSize: Styling.fontSize(-1)
+                    }
+
+                    // Resultado
+                    Flickable {
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        clip: true
+                        visible: !TranslatorService.loading && TranslatorService.output !== ""
+                        contentHeight: outText.implicitHeight
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        TextEdit {
+                            id: outText
+                            width: parent.width
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.Wrap
+                            text: TranslatorService.output
+                            color: Colors.overBackground
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(0)
                         }
                     }
                 }
             }
 
-            // Scrim para cerrar al clickear afuera
-            MouseArea {
-                anchors.fill: parent
-                visible: dock.trLangMenuOpen
-                z: 900
-                onClicked: dock.trLangMenuOpen = false
+            // === Barra de idiomas (chips horizontales, scroll/drag) ===
+            ListView {
+                id: langBar
+                anchors.top: srcBox.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: dock.hPadding
+                anchors.rightMargin: dock.hPadding
+                anchors.topMargin: 12
+                height: 36
+                orientation: ListView.Horizontal
+                spacing: 7
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: TranslatorService.languages
+
+                delegate: Rectangle {
+                    id: langChip
+                    required property var modelData
+                    required property int index
+                    readonly property bool sel: dock.trLangIndex === index
+                    height: 36
+                    width: lbRow.implicitWidth + 24
+                    radius: height / 2
+                    color: langChip.sel ? Colors.primary : (lbMouse.containsMouse ? Colors.surfaceContainerHighest : Colors.surfaceContainerHigh)
+                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                    Row {
+                        id: lbRow
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text {
+                            visible: langChip.sel
+                            text: Icons.globe
+                            font.family: Icons.font
+                            font.pixelSize: 12
+                            color: Colors.overPrimary
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: langChip.modelData.label
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.weight: langChip.sel ? Font.Bold : Font.Medium
+                            color: langChip.sel ? Colors.overPrimary : Colors.overBackground
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                    MouseArea {
+                        id: lbMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: dock.trLangIndex = langChip.index
+                    }
+                }
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: e => { langBar.contentX = Math.max(0, Math.min(Math.max(0, langBar.contentWidth - langBar.width), langBar.contentX - e.angleDelta.y)); e.accepted = true; }
+                }
             }
 
-            // Popup de idiomas (al nivel del tab → recibe clicks)
+            // === Botón Translate (full-width, prominente) ===
             Rectangle {
-                anchors.top: trControlsRow.bottom
+                id: translateBtn
+                anchors.top: langBar.bottom
                 anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
-                anchors.topMargin: 6
-                width: trLangButton.width
-                height: trLangCol.implicitHeight + 8
-                radius: Styling.radius(0)
-                color: Colors.surfaceContainerHighest
-                visible: dock.trLangMenuOpen
-                z: 999
+                anchors.rightMargin: dock.hPadding
+                anchors.topMargin: 12
+                height: 46
+                radius: height / 2
+                readonly property bool ready: srcInput.text.trim() !== "" && !TranslatorService.loading
+                color: translateBtn.ready ? Colors.primary : Colors.surfaceContainerHigh
+                Behavior on color { ColorAnimation { duration: 150 } }
 
-                Column {
-                    id: trLangCol
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: 4
-
-                    Repeater {
-                        model: TranslatorService.languages
-                        delegate: Rectangle {
-                            required property var modelData
-                            required property int index
-                            width: parent.width
-                            height: 34
-                            radius: Styling.radius(-6)
-                            color: langOptMouse.containsMouse ? Colors.primaryContainer : "transparent"
-
-                            Row {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-
-                                Text {
-                                    width: parent.width - 16
-                                    text: modelData.label
-                                    font.family: Config.theme.font
-                                    font.pixelSize: Styling.fontSize(-2)
-                                    font.weight: dock.trLangIndex === index ? Font.Bold : Font.Normal
-                                    color: dock.trLangIndex === index ? Colors.primary : (langOptMouse.containsMouse ? Colors.overPrimaryContainer : Colors.overBackground)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    elide: Text.ElideRight
-                                }
-                                Text {
-                                    visible: dock.trLangIndex === index
-                                    text: "●"
-                                    font.pixelSize: 9
-                                    color: Colors.primary
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-
-                            MouseArea {
-                                id: langOptMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    dock.trLangIndex = index;
-                                    dock.trLangMenuOpen = false;
-                                }
-                            }
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 9
+                    Text {
+                        text: TranslatorService.loading ? Icons.circleNotch : Icons.globe
+                        font.family: Icons.font
+                        font.pixelSize: 16
+                        color: translateBtn.ready ? Colors.overPrimary : Colors.outline
+                        anchors.verticalCenter: parent.verticalCenter
+                        RotationAnimation on rotation {
+                            running: TranslatorService.loading
+                            loops: Animation.Infinite
+                            from: 0
+                            to: 360
+                            duration: 900
                         }
+                    }
+                    Text {
+                        text: TranslatorService.loading ? "Translating..." : "Translate"
+                        font.family: Config.theme.font
+                        font.capitalization: Font.Capitalize
+                        font.pixelSize: Styling.fontSize(0)
+                        font.weight: Font.Bold
+                        color: translateBtn.ready ? Colors.overPrimary : Colors.outline
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (translateBtn.ready)
+                            TranslatorService.translate(srcInput.text, TranslatorService.languages[dock.trLangIndex].label);
                     }
                 }
             }
@@ -1971,7 +2090,9 @@ PanelWindow {
             anchors.bottom: parent.bottom
             visible: dock.currentTab === 4
 
-            // Display de la contraseña
+            readonly property color pwLvl: [Colors.error, Colors.tertiary, Colors.primary, Colors.primary][PasswordService.strengthLevel]
+
+            // === Hero: password coloreado por tipo de carácter ===
             Rectangle {
                 id: pwDisplay
                 anchors.top: parent.top
@@ -1979,158 +2100,161 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
-                height: 112
+                height: 146
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
+                clip: true
 
+                // Acento superior según la fuerza
+                Rectangle {
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 4
+                    color: passwordTabContent.pwLvl
+                    Behavior on color { ColorAnimation { duration: 200 } }
+                }
+
+                // Password (RichText coloreado)
                 Flickable {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    anchors.bottomMargin: 44
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: pwFooter.top
+                    anchors.margins: 18
                     clip: true
                     contentHeight: pwText.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
 
-                    TextEdit {
+                    Text {
                         id: pwText
                         width: parent.width
-                        readOnly: true
-                        selectByMouse: true
-                        wrapMode: TextEdit.WrapAnywhere
-                        text: PasswordService.password
-                        color: Colors.overBackground
+                        textFormat: Text.RichText
+                        text: dock.pwColored()
+                        wrapMode: Text.WrapAnywhere
                         font.family: Config.theme.monoFont
-                        font.pixelSize: Styling.fontSize(2)
+                        font.pixelSize: Styling.fontSize(4)
+                        lineHeight: 1.3
                     }
                 }
 
-                Text {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.margins: 16
-                    visible: PasswordService.password === ""
-                    text: "—"
-                    color: Colors.outline
-                    font.family: Config.theme.monoFont
-                    font.pixelSize: Styling.fontSize(2)
-                }
-
-                Row {
-                    anchors.right: parent.right
+                // Footer: fuerza + acciones
+                Item {
+                    id: pwFooter
                     anchors.bottom: parent.bottom
-                    anchors.margins: 10
-                    spacing: 8
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 46
 
-                    Rectangle {
-                        width: 34
-                        height: 34
-                        radius: width / 2
-                        color: regenMouse.containsMouse ? Colors.surfaceContainerHighest : "transparent"
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Text {
-                            anchors.centerIn: parent
-                            text: Icons.arrowCounterClockwise
-                            font.family: Icons.font
-                            font.pixelSize: 16
-                            color: Colors.overBackground
+                    Row {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 18
+                        spacing: 8
+                        Rectangle {
+                            width: 9
+                            height: 9
+                            radius: 4.5
+                            color: passwordTabContent.pwLvl
+                            anchors.verticalCenter: parent.verticalCenter
+                            Behavior on color { ColorAnimation { duration: 200 } }
                         }
-                        MouseArea {
-                            id: regenMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: PasswordService.generate()
+                        Text {
+                            text: PasswordService.strengthLabel + " · " + Math.round(PasswordService.entropyBits) + " bits"
+                            font.family: Config.theme.font
+                            font.capitalization: Font.Capitalize
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.weight: Font.Bold
+                            color: passwordTabContent.pwLvl
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
 
-                    Rectangle {
-                        width: 34
-                        height: 34
-                        radius: width / 2
-                        color: pwCopyMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Text {
-                            anchors.centerIn: parent
-                            text: Icons.copy
-                            font.family: Icons.font
-                            font.pixelSize: 15
-                            color: pwCopyMouse.containsMouse ? Colors.overPrimary : Colors.overBackground
+                    Row {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 12
+                        spacing: 8
+
+                        Rectangle {
+                            width: 36
+                            height: 36
+                            radius: width / 2
+                            color: regenMouse.containsMouse ? Colors.surfaceContainerHighest : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Text {
+                                anchors.centerIn: parent
+                                text: Icons.arrowCounterClockwise
+                                font.family: Icons.font
+                                font.pixelSize: 16
+                                color: Colors.overBackground
+                            }
+                            MouseArea {
+                                id: regenMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: PasswordService.generate()
+                            }
                         }
-                        MouseArea {
-                            id: pwCopyMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: dock.copyNoteText(PasswordService.password)
+
+                        Rectangle {
+                            id: pwCopyBtn
+                            property bool copied: false
+                            width: 36
+                            height: 36
+                            radius: width / 2
+                            color: pwCopyMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Timer { id: pwCopyTimer; interval: 1300; onTriggered: pwCopyBtn.copied = false }
+                            Text {
+                                anchors.centerIn: parent
+                                text: pwCopyBtn.copied ? Icons.accept : Icons.copy
+                                font.family: Icons.font
+                                font.pixelSize: 15
+                                color: pwCopyBtn.copied ? Colors.primary : (pwCopyMouse.containsMouse ? Colors.overPrimary : Colors.overBackground)
+                            }
+                            MouseArea {
+                                id: pwCopyMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    dock.copyNoteText(PasswordService.password);
+                                    pwCopyBtn.copied = true;
+                                    pwCopyTimer.restart();
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // Medidor de fuerza
-            ColumnLayout {
-                id: strengthCol
+            // === Largo: número grande + slider ===
+            RowLayout {
+                id: lengthRow
                 anchors.top: pwDisplay.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
-                anchors.topMargin: 14
-                spacing: 6
+                anchors.topMargin: 20
+                height: 52
+                spacing: 16
 
-                readonly property color lvlColor: [Colors.error, Colors.tertiary, Colors.primary, Colors.primary][PasswordService.strengthLevel]
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-                    Repeater {
-                        model: 4
-                        delegate: Rectangle {
-                            required property int index
-                            Layout.fillWidth: true
-                            height: 5
-                            radius: 3
-                            color: index <= PasswordService.strengthLevel ? strengthCol.lvlColor : Colors.surfaceContainerHighest
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-                    }
-                }
-
-                Text {
-                    text: PasswordService.strengthLabel + " · " + Math.round(PasswordService.entropyBits) + " Bits"
-                    font.family: Config.theme.font
-                    font.capitalization: Font.Capitalize
-                    font.pixelSize: Styling.fontSize(-2)
-                    color: Colors.outline
-                }
-            }
-
-            // Largo
-            ColumnLayout {
-                id: lengthCol
-                anchors.top: strengthCol.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: dock.hPadding
-                anchors.rightMargin: dock.hPadding
-                anchors.topMargin: 18
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
+                Column {
+                    spacing: -2
                     Text {
                         text: "Length"
                         font.family: Config.theme.font
                         font.capitalization: Font.Capitalize
-                        font.pixelSize: Styling.fontSize(-1)
-                        font.weight: Font.Medium
-                        color: Colors.overBackground
+                        font.pixelSize: Styling.fontSize(-2)
+                        color: Colors.outline
                     }
-                    Item { Layout.fillWidth: true }
                     Text {
                         text: PasswordService.length
                         font.family: Config.theme.monoFont
-                        font.pixelSize: Styling.fontSize(-1)
+                        font.pixelSize: Styling.fontSize(12)
                         font.weight: Font.Bold
                         color: Colors.primary
                     }
@@ -2139,6 +2263,7 @@ PanelWindow {
                 Item {
                     id: slider
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignVCenter
                     height: 22
                     readonly property int from: 8
                     readonly property int to: 64
@@ -2160,9 +2285,9 @@ PanelWindow {
                     }
                     Rectangle {
                         id: sHandle
-                        width: 18
-                        height: 18
-                        radius: 9
+                        width: 20
+                        height: 20
+                        radius: 10
                         color: Colors.primary
                         anchors.verticalCenter: parent.verticalCenter
                         x: slider.frac * (slider.width - width)
@@ -2181,42 +2306,54 @@ PanelWindow {
                 }
             }
 
-            // Toggles de tipos de caracteres
+            // === Toggles con color (legenda + control) ===
             Flow {
-                anchors.top: lengthCol.bottom
+                anchors.top: lengthRow.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
-                anchors.topMargin: 18
+                anchors.topMargin: 20
                 spacing: 8
 
                 Repeater {
                     model: [
-                        { label: "A-Z", key: "useUpper" },
-                        { label: "a-z", key: "useLower" },
-                        { label: "0-9", key: "useDigits" },
-                        { label: "!@#", key: "useSymbols" },
-                        { label: "No Ambiguous", key: "avoidAmbiguous" }
+                        { label: "a-z", key: "useLower", sw: Colors.overBackground },
+                        { label: "A-Z", key: "useUpper", sw: Colors.primary },
+                        { label: "0-9", key: "useDigits", sw: Colors.tertiary },
+                        { label: "!@#", key: "useSymbols", sw: Colors.error },
+                        { label: "No Ambiguous", key: "avoidAmbiguous", sw: Colors.outline }
                     ]
                     delegate: Rectangle {
                         id: tgChip
                         required property var modelData
                         readonly property bool on: PasswordService[modelData.key]
-                        height: 36
-                        width: tgText.implicitWidth + 28
+                        height: 38
+                        width: tgRow.implicitWidth + 26
                         radius: height / 2
-                        color: tgChip.on ? Colors.primary : Colors.surfaceContainerHigh
+                        color: tgChip.on ? Qt.rgba(modelData.sw.r, modelData.sw.g, modelData.sw.b, 0.22) : Colors.surfaceContainer
                         Behavior on color { ColorAnimation { duration: 150 } }
 
-                        Text {
-                            id: tgText
+                        Row {
+                            id: tgRow
                             anchors.centerIn: parent
-                            text: tgChip.modelData.label
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Medium
-                            color: tgChip.on ? Colors.overPrimary : Colors.overBackground
+                            spacing: 8
+                            Rectangle {
+                                width: 9
+                                height: 9
+                                radius: 4.5
+                                color: tgChip.modelData.sw
+                                opacity: tgChip.on ? 1 : 0.3
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: tgChip.modelData.label
+                                font.family: Config.theme.font
+                                font.pixelSize: Styling.fontSize(-1)
+                                font.weight: tgChip.on ? Font.Bold : Font.Medium
+                                color: tgChip.on ? Colors.overBackground : Colors.outline
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -2241,6 +2378,7 @@ PanelWindow {
             anchors.bottom: parent.bottom
             visible: dock.currentTab === 5
 
+            // === Input ===
             Rectangle {
                 id: devBox
                 anchors.top: parent.top
@@ -2248,13 +2386,14 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
-                height: 92
+                height: 96
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
 
                 Flickable {
                     anchors.fill: parent
                     anchors.margins: 14
+                    anchors.bottomMargin: 28
                     clip: true
                     contentHeight: devInput.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
@@ -2266,15 +2405,55 @@ PanelWindow {
                         padding: 0
                         background: null
                         color: Colors.overBackground
-                        placeholderText: "Input (texto, JSON, etc)..."
+                        placeholderText: "Input (text, JSON, etc)..."
                         placeholderTextColor: Colors.outline
                         font.family: Config.theme.monoFont
                         font.pixelSize: Styling.fontSize(0)
                         selectByMouse: true
                     }
                 }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 14
+                    anchors.bottomMargin: 8
+                    visible: devInput.text.length > 0
+                    text: devInput.text.length + " chars"
+                    font.family: Config.theme.monoFont
+                    font.pixelSize: Styling.fontSize(-3)
+                    color: Colors.outline
+                }
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 6
+                    width: 26
+                    height: 26
+                    radius: width / 2
+                    visible: devInput.text.length > 0
+                    color: devClearMouse.containsMouse ? Colors.surfaceContainerHighest : "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: Icons.cancel
+                        font.family: Icons.font
+                        font.pixelSize: 12
+                        color: Colors.outline
+                    }
+                    MouseArea {
+                        id: devClearMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            devInput.text = "";
+                            dock.devLastOp = "";
+                        }
+                    }
+                }
             }
 
+            // === Operaciones (chip activo = último op) ===
             Flow {
                 id: opsFlow
                 anchors.top: devBox.bottom
@@ -2283,38 +2462,43 @@ PanelWindow {
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
                 anchors.topMargin: 12
-                spacing: 8
+                spacing: 7
 
                 Repeater {
                     model: DevToolsService.ops
                     delegate: Rectangle {
                         id: opChip
                         required property var modelData
+                        readonly property bool active: dock.devLastOp === modelData.label
                         height: 34
                         width: opText.implicitWidth + 24
                         radius: height / 2
-                        color: opMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHigh
+                        color: opChip.active ? Colors.primary : (opMouse.containsMouse ? Colors.surfaceContainerHighest : Colors.surfaceContainerHigh)
                         Behavior on color { ColorAnimation { duration: 150 } }
                         Text {
                             id: opText
                             anchors.centerIn: parent
                             text: opChip.modelData.label
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(-1)
-                            font.weight: Font.Medium
-                            color: opMouse.containsMouse ? Colors.overPrimary : Colors.overBackground
+                            font.family: Config.theme.monoFont
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.weight: opChip.active ? Font.Bold : Font.Medium
+                            color: opChip.active ? Colors.overPrimary : Colors.overBackground
                         }
                         MouseArea {
                             id: opMouse
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: DevToolsService.run(opChip.modelData.key, devInput.text)
+                            onClicked: {
+                                dock.devLastOp = opChip.modelData.label;
+                                DevToolsService.run(opChip.modelData.key, devInput.text);
+                            }
                         }
                     }
                 }
             }
 
+            // === Output (header con el op + copiar) ===
             Rectangle {
                 id: devOut
                 anchors.top: opsFlow.bottom
@@ -2327,75 +2511,124 @@ PanelWindow {
                 anchors.bottomMargin: 16
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
+                clip: true
 
-                Text {
-                    anchors.centerIn: parent
-                    visible: DevToolsService.output === "" && DevToolsService.error === ""
-                    text: "Resultado"
-                    color: Colors.outline
-                    font.family: Config.theme.font
-                    font.capitalization: Font.Capitalize
-                    font.pixelSize: Styling.fontSize(-1)
-                }
+                Timer { id: devCopyTimer; interval: 1300; onTriggered: devCopyBtn.copied = false }
 
-                Text {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    visible: DevToolsService.error !== ""
-                    text: DevToolsService.error
-                    color: Colors.error
-                    font.family: Config.theme.font
-                    font.pixelSize: Styling.fontSize(-1)
-                    wrapMode: Text.WordWrap
-                }
+                // Header
+                Rectangle {
+                    id: devOutHeader
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    height: 36
+                    color: Colors.surfaceContainerHighest
+                    visible: DevToolsService.output !== "" || DevToolsService.error !== ""
 
-                Flickable {
-                    anchors.fill: parent
-                    anchors.margins: 14
-                    anchors.rightMargin: 46
-                    clip: true
-                    visible: DevToolsService.output !== "" && DevToolsService.error === ""
-                    contentHeight: devOutText.implicitHeight
-                    boundsBehavior: Flickable.StopAtBounds
+                    Row {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 14
+                        spacing: 7
+                        Text {
+                            text: Icons.terminal
+                            font.family: Icons.font
+                            font.pixelSize: 13
+                            color: DevToolsService.error !== "" ? Colors.error : Colors.primary
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: DevToolsService.error !== "" ? "Error" : (dock.devLastOp || "Output")
+                            font.family: Config.theme.font
+                            font.pixelSize: Styling.fontSize(-2)
+                            font.weight: Font.Bold
+                            color: DevToolsService.error !== "" ? Colors.error : Colors.overBackground
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
 
-                    TextEdit {
-                        id: devOutText
-                        width: parent.width
-                        readOnly: true
-                        selectByMouse: true
-                        wrapMode: TextEdit.WrapAnywhere
-                        text: DevToolsService.output
-                        color: Colors.overBackground
-                        font.family: Config.theme.monoFont
-                        font.pixelSize: Styling.fontSize(-1)
+                    Rectangle {
+                        id: devCopyBtn
+                        property bool copied: false
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 6
+                        width: 28
+                        height: 28
+                        radius: width / 2
+                        visible: DevToolsService.output !== ""
+                        color: devCopyMouse.containsMouse ? Colors.primary : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Text {
+                            anchors.centerIn: parent
+                            text: devCopyBtn.copied ? Icons.accept : Icons.copy
+                            font.family: Icons.font
+                            font.pixelSize: 13
+                            color: devCopyBtn.copied ? Colors.primary : (devCopyMouse.containsMouse ? Colors.overPrimary : Colors.overBackground)
+                        }
+                        MouseArea {
+                            id: devCopyMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                dock.copyNoteText(DevToolsService.output);
+                                devCopyBtn.copied = true;
+                                devCopyTimer.restart();
+                            }
+                        }
                     }
                 }
 
-                Rectangle {
-                    anchors.top: parent.top
+                // Body
+                Item {
+                    anchors.top: (DevToolsService.output !== "" || DevToolsService.error !== "") ? devOutHeader.bottom : parent.top
+                    anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.margins: 8
-                    width: 32
-                    height: 32
-                    radius: width / 2
-                    visible: DevToolsService.output !== ""
-                    color: devCopyMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    anchors.bottom: parent.bottom
+
                     Text {
                         anchors.centerIn: parent
-                        text: Icons.copy
-                        font.family: Icons.font
-                        font.pixelSize: 14
-                        color: devCopyMouse.containsMouse ? Colors.overPrimary : Colors.overBackground
+                        visible: DevToolsService.output === "" && DevToolsService.error === ""
+                        text: "Pick an operation"
+                        color: Colors.outline
+                        font.family: Config.theme.font
+                        font.capitalization: Font.Capitalize
+                        font.pixelSize: Styling.fontSize(-1)
                     }
-                    MouseArea {
-                        id: devCopyMouse
+
+                    Text {
                         anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: dock.copyNoteText(DevToolsService.output)
+                        anchors.margins: 16
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        visible: DevToolsService.error !== ""
+                        text: DevToolsService.error
+                        color: Colors.error
+                        font.family: Config.theme.font
+                        font.pixelSize: Styling.fontSize(-1)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Flickable {
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        clip: true
+                        visible: DevToolsService.output !== "" && DevToolsService.error === ""
+                        contentHeight: devOutText.implicitHeight
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        TextEdit {
+                            id: devOutText
+                            width: parent.width
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.WrapAnywhere
+                            text: DevToolsService.output
+                            color: Colors.overBackground
+                            font.family: Config.theme.monoFont
+                            font.pixelSize: Styling.fontSize(-1)
+                        }
                     }
                 }
             }
@@ -2420,6 +2653,20 @@ PanelWindow {
                 }
             }
 
+            // wl-paste → input
+            Process {
+                id: qrPasteProc
+                running: false
+                stdout: StdioCollector {
+                    id: qrPasteOut
+                    waitForEnd: true
+                }
+                onExited: code => { if (code === 0) qrInput.text = qrPasteOut.text.replace(/\n+$/, ""); }
+            }
+            // copiar PNG del QR al portapapeles
+            Process { id: qrImgCopyProc; running: false }
+
+            // === Input ===
             Rectangle {
                 id: qrInputBox
                 anchors.top: parent.top
@@ -2427,13 +2674,14 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.leftMargin: dock.hPadding
                 anchors.rightMargin: dock.hPadding
-                height: 88
+                height: 96
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
 
                 Flickable {
                     anchors.fill: parent
                     anchors.margins: 14
+                    anchors.bottomMargin: 30
                     clip: true
                     contentHeight: qrInput.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
@@ -2445,7 +2693,7 @@ PanelWindow {
                         padding: 0
                         background: null
                         color: Colors.overBackground
-                        placeholderText: "Texto o URL para el QR..."
+                        placeholderText: "Text or URL for the QR..."
                         placeholderTextColor: Colors.outline
                         font.family: Config.theme.font
                         font.pixelSize: Styling.fontSize(0)
@@ -2453,9 +2701,74 @@ PanelWindow {
                         onTextChanged: qrDebounce.restart()
                     }
                 }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 14
+                    anchors.bottomMargin: 9
+                    visible: qrInput.text.length > 0
+                    text: qrInput.text.length + " chars"
+                    font.family: Config.theme.monoFont
+                    font.pixelSize: Styling.fontSize(-3)
+                    color: Colors.outline
+                }
+
+                Row {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 7
+                    spacing: 4
+
+                    // Pegar del portapapeles
+                    Rectangle {
+                        width: 26
+                        height: 26
+                        radius: width / 2
+                        color: qrPasteMouse.containsMouse ? Colors.surfaceContainerHighest : "transparent"
+                        Text {
+                            anchors.centerIn: parent
+                            text: Icons.clipboard
+                            font.family: Icons.font
+                            font.pixelSize: 12
+                            color: Colors.outline
+                        }
+                        MouseArea {
+                            id: qrPasteMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: { qrPasteProc.command = ["sh", "-c", "wl-paste -n"]; qrPasteProc.running = true; }
+                        }
+                    }
+                    // Limpiar
+                    Rectangle {
+                        width: 26
+                        height: 26
+                        radius: width / 2
+                        visible: qrInput.text.length > 0
+                        color: qrClearMouse.containsMouse ? Colors.surfaceContainerHighest : "transparent"
+                        Text {
+                            anchors.centerIn: parent
+                            text: Icons.cancel
+                            font.family: Icons.font
+                            font.pixelSize: 12
+                            color: Colors.outline
+                        }
+                        MouseArea {
+                            id: qrClearMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: qrInput.text = ""
+                        }
+                    }
+                }
             }
 
+            // === Área del QR ===
             Rectangle {
+                id: qrArea
                 anchors.top: qrInputBox.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -2466,7 +2779,9 @@ PanelWindow {
                 anchors.bottomMargin: 16
                 radius: Styling.radius(2)
                 color: Colors.surfaceContainerHigh
+                clip: true
 
+                // Placeholder
                 ColumnLayout {
                     anchors.centerIn: parent
                     spacing: 10
@@ -2476,12 +2791,12 @@ PanelWindow {
                         Layout.alignment: Qt.AlignHCenter
                         text: Icons.qrCode
                         font.family: Icons.font
-                        font.pixelSize: 46
+                        font.pixelSize: 50
                         color: Colors.outlineVariant
                     }
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        text: "Escribí Algo Arriba"
+                        text: "Type Something Above"
                         font.family: Config.theme.font
                         font.capitalization: Font.Capitalize
                         font.pixelSize: Styling.fontSize(-1)
@@ -2489,21 +2804,95 @@ PanelWindow {
                     }
                 }
 
+                // Card blanca con el QR
                 Rectangle {
-                    anchors.centerIn: parent
-                    width: Math.min(parent.width - 48, parent.height - 48, 260)
+                    id: qrCard
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 18
+                    width: Math.min(qrArea.width - 36, qrArea.height - 80, 280)
                     height: width
-                    radius: Styling.radius(-4)
+                    radius: Styling.radius(0)
                     color: "#ffffff"
                     visible: QrService.ready
 
                     Image {
                         anchors.fill: parent
-                        anchors.margins: 10
+                        anchors.margins: 12
                         source: QrService.ready ? ("file://" + QrService.outPath + "?r=" + QrService.revision) : ""
                         cache: false
                         fillMode: Image.PreserveAspectFit
                         smooth: false
+                    }
+                }
+
+                // Footer: texto codificado + copiar imagen
+                Item {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 10
+                    height: 42
+                    visible: QrService.ready
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.right: copyImgBtn.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 8
+                        text: qrInput.text
+                        font.family: Config.theme.monoFont
+                        font.pixelSize: Styling.fontSize(-3)
+                        color: Colors.outline
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    Rectangle {
+                        id: copyImgBtn
+                        property bool copied: false
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 30
+                        width: copyImgRow.implicitWidth + 22
+                        radius: height / 2
+                        color: copyImgMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHighest
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Timer { id: qrImgCopyTimer; interval: 1300; onTriggered: copyImgBtn.copied = false }
+                        Row {
+                            id: copyImgRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Text {
+                                text: copyImgBtn.copied ? Icons.accept : Icons.image
+                                font.family: Icons.font
+                                font.pixelSize: 13
+                                color: copyImgBtn.copied ? Colors.primary : (copyImgMouse.containsMouse ? Colors.overPrimary : Colors.overBackground)
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: copyImgBtn.copied ? "Copied" : "Copy image"
+                                font.family: Config.theme.font
+                                font.capitalization: Font.Capitalize
+                                font.pixelSize: Styling.fontSize(-2)
+                                font.weight: Font.Medium
+                                color: copyImgBtn.copied ? Colors.primary : (copyImgMouse.containsMouse ? Colors.overPrimary : Colors.overBackground)
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                        MouseArea {
+                            id: copyImgMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                qrImgCopyProc.command = ["sh", "-c", "wl-copy --type image/png < " + QrService.outPath];
+                                qrImgCopyProc.running = true;
+                                copyImgBtn.copied = true;
+                                qrImgCopyTimer.restart();
+                            }
+                        }
                     }
                 }
             }
