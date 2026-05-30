@@ -21,6 +21,7 @@ PanelWindow {
         top: true
         bottom: true
         left: true
+        right: true
     }
 
     color: "transparent"
@@ -32,11 +33,14 @@ PanelWindow {
     // Siempre visible para permitir que la máscara hoverStrip reciba eventos del cursor cuando está cerrado.
     visible: true
 
-    readonly property int dockWidth: 420
+    readonly property int dockWidth: 860
     readonly property int hPadding: 16
     readonly property int sectionSpacing: 12
     readonly property int headerHeight: 120
     readonly property int shoulderSize: Config.roundness > 0 ? Config.roundness + 28 : 44
+
+    // Panel inferior tipo notch: alto fijo (todas las cards llevan imagen/placeholder).
+    readonly property int panelHeight: Math.min(360, dock.height - dock.barReserved - 28)
 
     // Tab activa: 0=Tech News, 1=CVEs, 2=Reddit
     property int currentTab: 0
@@ -74,22 +78,34 @@ PanelWindow {
         return Config.bar?.position === "top" ? base : 0;
     }
 
-    implicitWidth: dockWidth + dock.shoulderSize + 8
-
-    // Patrón mask: cerrado → click-through (null), abierto → fullMask con hombros de unión.
+    // Máscara: cerrado → click-through (null); abierto → cuerpo + hombros cóncavos al borde inferior.
     mask: Region {
         regions: [
-            Region { item: dock.isOpen ? fullMask : null },
-            Region { item: (dock.isOpen && (!dock.barAtTop || Config.showBackground)) ? topRightShoulder : null },
-            Region { item: (dock.isOpen && !dock.barAtTop && Config.showBackground) ? bottomRightShoulder : null }
+            Region { item: dock.isOpen ? bodyMask : null },
+            Region { item: dock.isOpen ? leftShoulderMask : null },
+            Region { item: dock.isOpen ? rightShoulderMask : null }
         ]
     }
     Item {
-        id: fullMask
-        x: 0
-        y: dock.barReserved
+        id: bodyMask
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
         width: dock.dockWidth
-        height: dock.height - dock.barReserved
+        height: dock.panelHeight
+    }
+    Item {
+        id: leftShoulderMask
+        anchors.bottom: parent.bottom
+        anchors.right: bodyMask.left
+        width: dock.shoulderSize
+        height: dock.shoulderSize
+    }
+    Item {
+        id: rightShoulderMask
+        anchors.bottom: parent.bottom
+        anchors.left: bodyMask.right
+        width: dock.shoulderSize
+        height: dock.shoulderSize
     }
 
     // Temporizador para auto-cerrar el panel tras 600ms de inactividad del cursor
@@ -108,11 +124,10 @@ PanelWindow {
 
     Item {
         id: dockContainer
-        width: dock.dockContainerWidth
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.topMargin: dock.barReserved
         anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: dock.dockWidth
+        height: dock.panelHeight
         opacity: dock.isOpen ? 1 : 0
         visible: opacity > 0.001
 
@@ -127,10 +142,11 @@ PanelWindow {
             }
         }
 
+        // Sube desde el borde inferior.
         transform: Translate {
             id: slideTransform
-            x: dock.isOpen ? 0 : -dock.dockContainerWidth
-            Behavior on x {
+            y: dock.isOpen ? 0 : dock.panelHeight + 40
+            Behavior on y {
                 NumberAnimation {
                     duration: Config.animDuration > 0 ? Config.animDuration : 220
                     easing.type: dock.isOpen ? Easing.OutCubic : Easing.InCubic
@@ -145,223 +161,34 @@ PanelWindow {
             }
         }
 
-        // Dock body — bg matugen sólido, sin border.
+        // Cuerpo del panel — bg matugen, esquinas SUPERIORES redondeadas (notch inferior).
         StyledRect {
             id: dockBg
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: dock.dockWidth
+            anchors.fill: parent
             variant: "bg"
             enableShadow: true
             radius: 0
-            topLeftRadius: 0
+            topLeftRadius: Config.roundness > 0 ? Config.roundness + 8 : 0
+            topRightRadius: Config.roundness > 0 ? Config.roundness + 8 : 0
             bottomLeftRadius: 0
-            topRightRadius: 0
             bottomRightRadius: 0
             clip: true
         }
 
-        // Header fijo
-        Item {
-            id: dockHeader
-            anchors.top: dockBg.top
-            anchors.left: dockBg.left
-            anchors.right: dockBg.right
-            height: dock.headerHeight
-            clip: true
-            z: 5
-
-            // Dynamic header background image
-            Image {
-                anchors.fill: parent
-                source: "file://" + Quickshell.env("HOME") + "/.cache/ambxst/images/header_bg.jpg"
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                opacity: 0.45
-            }
-
-            // Dark tint layer
-            Rectangle {
-                anchors.fill: parent
-                color: Qt.rgba(0, 0, 0, 0.35)
-            }
-
-            // Seamless gradient transition to widget bg
-            Rectangle {
-                anchors.fill: parent
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 1.0; color: dockBg.color }
-                }
-            }
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: dock.hPadding
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    // Live Feed Indicator
-                    Rectangle {
-                        id: liveBadge
-                        height: 22
-                        width: liveRow.implicitWidth + 16
-                        radius: 0
-                        color: "transparent"
-                        border.color: dock.tabAccent
-                        border.width: 1
-
-                        Row {
-                            id: liveRow
-                            anchors.centerIn: parent
-                            spacing: 6
-
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 0
-                                color: dock.tabAccent
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                SequentialAnimation on opacity {
-                                    loops: Animation.Infinite
-                                    NumberAnimation { from: 1.0; to: 0.3; duration: 800; easing.type: Easing.InOutQuad }
-                                    NumberAnimation { from: 0.3; to: 1.0; duration: 800; easing.type: Easing.InOutQuad }
-                                }
-                            }
-
-                            Text {
-                                text: "LIVE FEED"
-                                color: Colors.overBackground
-                                font.family: Config.theme.font
-                                font.pixelSize: Styling.fontSize(-2)
-                                font.weight: Font.Bold
-                                font.letterSpacing: 1
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    // Botón cerrar (X)
-                    Item {
-                        width: 32
-                        height: 32
-                        Layout.alignment: Qt.AlignVCenter
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 0
-                            color: closeMouse.containsMouse ? Qt.rgba(dock.tabAccent.r, dock.tabAccent.g, dock.tabAccent.b, 0.22) : "transparent"
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: Icons.cancel
-                            font.family: Icons.font
-                            font.pixelSize: 16
-                            color: Colors.overBackground
-                        }
-
-                        MouseArea {
-                            id: closeMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: GlobalStates.newsPanelOpen = false
-                        }
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        Rectangle { width: 5; Layout.preferredHeight: titleT.implicitHeight; color: dock.tabAccent }
-                        Text {
-                            id: titleT
-                            text: "NEWS // SECURITY"
-                            color: Colors.overBackground
-                            font.family: Config.theme.font
-                            font.pixelSize: Styling.fontSize(3)
-                            font.weight: Font.ExtraBold
-                            font.letterSpacing: 1
-                            Layout.fillWidth: true
-                        }
-                    }
-
-                    Text {
-                        text: "CURATED TECH & VULNERABILITY UPDATES"
-                        color: Colors.outline
-                        font.family: Config.theme.font
-                        font.pixelSize: Styling.fontSize(-2)
-                        font.weight: Font.Bold
-                        font.letterSpacing: 1.5
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                    }
-                }
-            }
-        }
-
-        // Hombro cóncavo top-right del dock body (solo si bar está arriba).
-        Item {
-            id: topRightShoulder
-            width: dock.shoulderSize
-            height: dock.shoulderSize
-            anchors.top: dockBg.top
-            anchors.left: dockBg.right
-            visible: !dock.barAtTop || Config.showBackground
-
-            RoundCorner {
-                anchors.fill: parent
-                corner: RoundCorner.CornerEnum.TopLeft
-                size: dock.shoulderSize
-                color: dockBg.color
-                Behavior on color { ColorAnimation { duration: 700 } }
-            }
-        }
-
-        // Hombro cóncavo bottom-right del dock body (solo si bar está abajo).
-        Item {
-            id: bottomRightShoulder
-            width: dock.shoulderSize
-            height: dock.shoulderSize
-            anchors.bottom: dockBg.bottom
-            anchors.left: dockBg.right
-            visible: !dock.barAtTop && Config.showBackground
-
-            RoundCorner {
-                anchors.fill: parent
-                corner: RoundCorner.CornerEnum.BottomLeft
-                size: dock.shoulderSize
-                color: dockBg.color
-                Behavior on color { ColorAnimation { duration: 700 } }
-            }
-        }
-
-        // Floating tab pills (debajo del header)
+        // Tabs abajo, centrados
         Row {
             id: tabPills
-            z: 100
-            anchors.top: dockHeader.bottom
+            anchors.bottom: dockBg.bottom
             anchors.horizontalCenter: dockBg.horizontalCenter
-            anchors.topMargin: 4
-            spacing: 12
+            anchors.bottomMargin: 12
+            spacing: 8
+            z: 120
 
             Repeater {
                 model: [
-                    { ico: Icons.globe },
-                    { ico: Icons.shield },
-                    { ico: Icons.reddit }
+                    { ico: Icons.globe, label: "News", accent: Colors.primary },
+                    { ico: Icons.shield, label: "CVEs", accent: Colors.error },
+                    { ico: Icons.reddit, label: "Reddit", accent: Colors.tertiary }
                 ]
 
                 Rectangle {
@@ -369,25 +196,34 @@ PanelWindow {
                     required property var modelData
                     required property int index
                     readonly property bool isActive: dock.currentTab === index
+                    height: 38
+                    width: pillRow.implicitWidth + 30
+                    radius: height / 2
+                    color: pill.isActive ? pill.modelData.accent : (pillMouse.containsMouse ? Colors.surfaceContainerHigh : Colors.surfaceContainer)
+                    Behavior on color { ColorAnimation { duration: 180 } }
 
-                    width: 64
-                    height: 40
-                    radius: 0
-                    color: isActive
-                        ? dock.tabAccent
-                        : (pillMouse.containsMouse ? Qt.rgba(dock.tabAccent.r, dock.tabAccent.g, dock.tabAccent.b, 0.15) : "transparent")
-                    border.color: isActive ? dock.tabAccent : Colors.outline
-                    border.width: 2
-                    Behavior on color { ColorAnimation { duration: 220 } }
-                    Behavior on border.color { ColorAnimation { duration: 220 } }
-
-                    Text {
+                    Row {
+                        id: pillRow
                         anchors.centerIn: parent
-                        text: pill.modelData.ico
-                        textFormat: Text.RichText
-                        font.family: Icons.font
-                        font.pixelSize: 18
-                        color: pill.isActive ? Colors.background : Colors.overBackground
+                        spacing: 8
+
+                        Text {
+                            text: pill.modelData.ico
+                            textFormat: Text.RichText
+                            font.family: Icons.font
+                            font.pixelSize: 16
+                            color: pill.isActive ? Colors.background : Colors.overBackground
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: pill.modelData.label
+                            font.family: Config.theme.font
+                            font.capitalization: Font.Capitalize
+                            font.pixelSize: Styling.fontSize(-1)
+                            font.weight: Font.Bold
+                            color: pill.isActive ? Colors.background : Colors.overBackground
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
                     }
 
                     MouseArea {
@@ -401,100 +237,100 @@ PanelWindow {
             }
         }
 
-        ScrollView {
-            id: scroller
+        // Hombro cóncavo inferior-izquierdo (funde el cuerpo con el borde de abajo).
+        Item {
+            id: leftShoulder
+            width: dock.shoulderSize
+            height: dock.shoulderSize
+            anchors.bottom: dockBg.bottom
+            anchors.right: dockBg.left
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: RoundCorner.CornerEnum.BottomRight
+                size: dock.shoulderSize
+                color: dockBg.color
+                Behavior on color { ColorAnimation { duration: 700 } }
+            }
+        }
+
+        // Hombro cóncavo inferior-derecho.
+        Item {
+            id: rightShoulder
+            width: dock.shoulderSize
+            height: dock.shoulderSize
+            anchors.bottom: dockBg.bottom
+            anchors.left: dockBg.right
+
+            RoundCorner {
+                anchors.fill: parent
+                corner: RoundCorner.CornerEnum.BottomLeft
+                size: dock.shoulderSize
+                color: dockBg.color
+                Behavior on color { ColorAnimation { duration: 700 } }
+            }
+        }
+
+        // Feed: una sola fila horizontal por tab (scroll con rueda o arrastrar).
+        Item {
+            id: feedArea
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: tabPills.bottom
-            anchors.topMargin: 16
-            anchors.bottom: parent.bottom
-            width: dock.dockWidth
-            clip: true
-            bottomPadding: 24
-            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            anchors.leftMargin: dock.hPadding
+            anchors.rightMargin: dock.hPadding
+            anchors.top: dockBg.top
+            anchors.topMargin: 26
+            anchors.bottom: tabPills.top
+            anchors.bottomMargin: 12
 
-            NumberAnimation {
-                id: scrollAnim
-                target: scroller.contentItem
-                property: "contentY"
-                duration: 250
-                easing.type: Easing.OutCubic
-            }
-
-            WheelHandler {
-                target: scroller.contentItem
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                onWheel: (event) => {
-                    var flick = scroller.contentItem;
-                    var scrollStep = event.angleDelta.y * 1.5;
-                    var currentTarget = scrollAnim.running ? scrollAnim.to : flick.contentY;
-                    var newTarget = Math.max(0, Math.min(flick.contentHeight - flick.height, currentTarget - scrollStep));
-                    scrollAnim.stop();
-                    scrollAnim.to = newTarget;
-                    scrollAnim.start();
-                    event.accepted = true;
+            // Tab 0: Tech News
+            ListView {
+                id: techList
+                anchors.fill: parent
+                orientation: ListView.Horizontal
+                spacing: 12
+                clip: true
+                visible: dock.currentTab === 0
+                boundsBehavior: Flickable.StopAtBounds
+                model: (!NewsService.isLoadingNews && !NewsService.newsFailed) ? NewsService.techNews : []
+                delegate: newsCardDelegate
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: e => { techList.contentX = Math.max(0, Math.min(Math.max(0, techList.contentWidth - techList.width), techList.contentX - e.angleDelta.y)); e.accepted = true; }
                 }
             }
+            Loader {
+                anchors.centerIn: parent
+                active: dock.currentTab === 0 && (NewsService.isLoadingNews || NewsService.newsFailed || NewsService.techNews.length === 0)
+                visible: active
+                sourceComponent: listStatusView
+                property bool isLoading: NewsService.isLoadingNews
+                property string statusText: NewsService.isLoadingNews ? "Fetching latest news..." : (NewsService.newsFailed ? "Failed to retrieve news feed." : "No articles available.")
+                function onRetry() { NewsService.updateNews() }
+            }
 
-            Column {
-                id: contentStack
-                x: 12
-                width: scroller.width - 24
-                spacing: 0
-
-                    // Tab 0: Tech News
-                    ColumnLayout {
-                        id: techColumn
-                        width: parent.width
-                        spacing: 12
-                        visible: dock.currentTab === 0
-
-                        Loader {
-                            Layout.fillWidth: true
-                            active: NewsService.isLoadingNews || NewsService.newsFailed || NewsService.techNews.length === 0
-                            visible: active
-                            sourceComponent: listStatusView
-                            
-                            property bool isLoading: NewsService.isLoadingNews
-                            property string statusText: NewsService.isLoadingNews ? "Fetching latest news..." : (NewsService.newsFailed ? "Failed to retrieve news feed." : "No articles available.")
-                            function onRetry() { NewsService.updateNews() }
-                        }
-
-                        Repeater {
-                            model: (!NewsService.isLoadingNews && !NewsService.newsFailed) ? NewsService.techNews : []
-                            delegate: newsCardDelegate
-                        }
-                    }
-
-                    // Tab 1: Latest CVEs
-                    ColumnLayout {
-                        id: cveColumn
-                        width: parent.width
-                        spacing: 12
-                        visible: dock.currentTab === 1
-
-                        Loader {
-                            Layout.fillWidth: true
-                            active: NewsService.isLoadingCve || NewsService.cveFailed || NewsService.cveFeed.length === 0
-                            visible: active
-                            sourceComponent: listStatusView
-                            
-                            property bool isLoading: NewsService.isLoadingCve
-                            property string statusText: NewsService.isLoadingCve ? "Scanning vulnerability databases..." : (NewsService.cveFailed ? "Failed to retrieve vulnerabilities." : "No CVE reports available.")
-                            function onRetry() { NewsService.updateCve() }
-                        }
-
-                        Repeater {
-                            model: (!NewsService.isLoadingCve && !NewsService.cveFailed) ? NewsService.cveFeed : []
-
-                            delegate: StyledRect {
+            // Tab 1: Latest CVEs
+            ListView {
+                id: cveList
+                anchors.fill: parent
+                orientation: ListView.Horizontal
+                spacing: 12
+                clip: true
+                visible: dock.currentTab === 1
+                boundsBehavior: Flickable.StopAtBounds
+                model: (!NewsService.isLoadingCve && !NewsService.cveFailed) ? NewsService.cveFeed : []
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: e => { cveList.contentX = Math.max(0, Math.min(Math.max(0, cveList.contentWidth - cveList.width), cveList.contentX - e.angleDelta.y)); e.accepted = true; }
+                }
+                delegate: StyledRect {
                                 id: cveCard
                                 required property var modelData
                                 required property int index
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: cveCol.implicitHeight
+                                width: 320
+                                height: ListView.view ? ListView.view.height : 280
                                 variant: "internalbg"
-                                radius: 0
+                                radius: Styling.radius(-4)
                                 enableShadow: false
 
                                 property bool isHovered: false
@@ -511,15 +347,6 @@ PanelWindow {
                                     onHoveredChanged: cveCard.isHovered = hovered
                                 }
 
-                                // Barra de severidad (matugen) a la izquierda
-                                Rectangle {
-                                    anchors.left: parent.left
-                                    anchors.top: parent.top
-                                    anchors.bottom: parent.bottom
-                                    width: 4
-                                    color: cveCard.accent
-                                    z: 2
-                                }
                                 Rectangle {
                                     anchors.fill: parent
                                     color: cveCard.accent
@@ -542,8 +369,30 @@ PanelWindow {
                                     anchors.left: parent.left
                                     anchors.right: parent.right
                                     anchors.top: parent.top
-                                    anchors.leftMargin: 4
                                     spacing: 6
+
+                                    // Banner placeholder con acento por severidad
+                                    Item {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 110
+                                        clip: true
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            gradient: Gradient {
+                                                orientation: Gradient.Horizontal
+                                                GradientStop { position: 0.0; color: Qt.rgba(cveCard.accent.r, cveCard.accent.g, cveCard.accent.b, 0.30) }
+                                                GradientStop { position: 1.0; color: Qt.rgba(cveCard.accent.r, cveCard.accent.g, cveCard.accent.b, 0.08) }
+                                            }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: Icons.shield
+                                                textFormat: Text.RichText
+                                                font.family: Icons.font
+                                                font.pixelSize: 44
+                                                color: Qt.rgba(cveCard.accent.r, cveCard.accent.g, cveCard.accent.b, 0.55)
+                                            }
+                                        }
+                                    }
 
                                     // Fila superior: shield + severidad (CAPS) + score (mono grande)
                                     RowLayout {
@@ -705,35 +554,44 @@ PanelWindow {
                                     }
                                 }
                             }
-                        }
-                    }
+            }
+            Loader {
+                anchors.centerIn: parent
+                active: dock.currentTab === 1 && (NewsService.isLoadingCve || NewsService.cveFailed || NewsService.cveFeed.length === 0)
+                visible: active
+                sourceComponent: listStatusView
+                property bool isLoading: NewsService.isLoadingCve
+                property string statusText: NewsService.isLoadingCve ? "Scanning vulnerability databases..." : (NewsService.cveFailed ? "Failed to retrieve vulnerabilities." : "No CVE reports available.")
+                function onRetry() { NewsService.updateCve() }
+            }
 
-                    // Tab 2: Reddit Updates
-                    ColumnLayout {
-                        id: redditColumn
-                        width: parent.width
-                        spacing: 12
-                        visible: dock.currentTab === 2
-
-                        Loader {
-                            Layout.fillWidth: true
-                            active: NewsService.isLoadingReddit || NewsService.redditFailed || NewsService.redditFeed.length === 0
-                            visible: active
-                            sourceComponent: listStatusView
-                            
-                            property bool isLoading: NewsService.isLoadingReddit
-                            property string statusText: NewsService.isLoadingReddit ? "Fetching Reddit posts..." : (NewsService.redditFailed ? "Failed to retrieve Reddit feed." : "No posts available.")
-                            function onRetry() { NewsService.updateReddit() }
-                        }
-
-                        Repeater {
-                            model: (!NewsService.isLoadingReddit && !NewsService.redditFailed) ? NewsService.redditFeed : []
-                            delegate: newsCardDelegate
-                        }
-                    }
+            // Tab 2: Reddit Updates
+            ListView {
+                id: redditList
+                anchors.fill: parent
+                orientation: ListView.Horizontal
+                spacing: 12
+                clip: true
+                visible: dock.currentTab === 2
+                boundsBehavior: Flickable.StopAtBounds
+                model: (!NewsService.isLoadingReddit && !NewsService.redditFailed) ? NewsService.redditFeed : []
+                delegate: newsCardDelegate
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: e => { redditList.contentX = Math.max(0, Math.min(Math.max(0, redditList.contentWidth - redditList.width), redditList.contentX - e.angleDelta.y)); e.accepted = true; }
                 }
             }
+            Loader {
+                anchors.centerIn: parent
+                active: dock.currentTab === 2 && (NewsService.isLoadingReddit || NewsService.redditFailed || NewsService.redditFeed.length === 0)
+                visible: active
+                sourceComponent: listStatusView
+                property bool isLoading: NewsService.isLoadingReddit
+                property string statusText: NewsService.isLoadingReddit ? "Fetching Reddit posts..." : (NewsService.redditFailed ? "Failed to retrieve Reddit feed." : "No posts available.")
+                function onRetry() { NewsService.updateReddit() }
+            }
         }
+    }
 
     Component {
         id: newsCardDelegate
@@ -741,10 +599,10 @@ PanelWindow {
             id: cardRect
             required property var modelData
             required property int index
-            Layout.fillWidth: true
-            Layout.preferredHeight: contentColumn.implicitHeight
+            width: 300
+            height: ListView.view ? ListView.view.height : 280
             variant: "internalbg"
-            radius: 0
+            radius: Styling.radius(-4)
             enableShadow: false
 
             property bool isHovered: false
@@ -754,16 +612,6 @@ PanelWindow {
                 onHoveredChanged: cardRect.isHovered = hovered
             }
 
-            // Barra de acento gruesa a la izquierda (brutalista)
-            Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 4
-                color: cardRect.accent
-                opacity: cardRect.isHovered ? 1.0 : 0.85
-                z: 2
-            }
             // Resalte de bloque en hover
             Rectangle {
                 anchors.fill: parent
@@ -787,22 +635,39 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.leftMargin: 4   // deja ver la barra de acento
                 spacing: 0
 
-                // Imagen (bloque recto, sin máscara redondeada). Solo si hay imagen.
+                // Imagen (siempre 150; placeholder con acento si el item no trae imagen)
                 Item {
                     id: imageArea
                     Layout.fillWidth: true
-                    Layout.preferredHeight: cardRect.modelData.image !== "" ? 150 : 0
-                    visible: cardRect.modelData.image !== ""
+                    Layout.preferredHeight: 150
                     clip: true
+
+                    // Placeholder: gradiente con el acento + icono grande tenue
+                    Rectangle {
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: Qt.rgba(cardRect.accent.r, cardRect.accent.g, cardRect.accent.b, 0.28) }
+                            GradientStop { position: 1.0; color: Qt.rgba(cardRect.accent.r, cardRect.accent.g, cardRect.accent.b, 0.08) }
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            text: dock.currentTab === 2 ? Icons.reddit : Icons.globe
+                            textFormat: Text.RichText
+                            font.family: Icons.font
+                            font.pixelSize: 46
+                            color: Qt.rgba(cardRect.accent.r, cardRect.accent.g, cardRect.accent.b, 0.55)
+                        }
+                    }
 
                     Image {
                         id: thumbImage
                         anchors.fill: parent
                         source: cardRect.modelData.image || ""
                         opacity: status === Image.Ready ? 1.0 : 0.0
+                        visible: cardRect.modelData.image !== ""
                         Behavior on opacity { NumberAnimation { duration: 200 } }
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
