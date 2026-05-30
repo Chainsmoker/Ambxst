@@ -531,6 +531,43 @@ Item {
                         }
                     }
                 }
+
+                // News & CVEs (panel inferior tipo notch)
+                Loader {
+                    active: true
+                    visible: active
+                    Layout.alignment: Qt.AlignVCenter
+
+                    sourceComponent: Button {
+                        id: newsButton
+                        implicitWidth: 32
+                        implicitHeight: 32
+
+                        background: StyledRect {
+                            visible: newsButton.hovered
+                            variant: "focus"
+                            radius: Styling.radius(-2)
+                            enableShadow: false
+                            enableBorder: false
+                        }
+
+                        contentItem: Text {
+                            text: Icons.globe
+                            font.family: Icons.font
+                            font.pixelSize: 18
+                            color: Colors.overBackground
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: GlobalStates.newsPanelOpen = !GlobalStates.newsPanelOpen
+
+                        StyledToolTip {
+                            show: newsButton.hovered
+                            tooltipText: "News & CVEs"
+                        }
+                    }
+                }
             }
 
             // Vertical layout
@@ -662,6 +699,43 @@ Item {
                         StyledToolTip {
                             show: overviewButtonV.hovered
                             tooltipText: "Overview"
+                        }
+                    }
+                }
+
+                // News & CVEs (panel inferior tipo notch)
+                Loader {
+                    active: true
+                    visible: active
+                    Layout.alignment: Qt.AlignHCenter
+
+                    sourceComponent: Button {
+                        id: newsButtonV
+                        implicitWidth: 32
+                        implicitHeight: 32
+
+                        background: StyledRect {
+                            visible: newsButtonV.hovered
+                            variant: "focus"
+                            radius: Styling.radius(-2)
+                            enableShadow: false
+                            enableBorder: false
+                        }
+
+                        contentItem: Text {
+                            text: Icons.globe
+                            font.family: Icons.font
+                            font.pixelSize: 18
+                            color: Colors.overBackground
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        onClicked: GlobalStates.newsPanelOpen = !GlobalStates.newsPanelOpen
+
+                        StyledToolTip {
+                            show: newsButtonV.hovered
+                            tooltipText: "News & CVEs"
                         }
                     }
                 }

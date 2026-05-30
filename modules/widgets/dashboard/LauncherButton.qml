@@ -9,9 +9,9 @@ ToggleButton {
     iconTint: Config.bar.launcherIconTint
     iconFullTint: Config.bar.launcherIconFullTint
     iconSize: Config.bar.launcherIconSize
-    tooltipText: "Open News & Security"
+    tooltipText: "Open Tools"
 
     onToggle: function () {
-        GlobalStates.newsPanelOpen = !GlobalStates.newsPanelOpen;
+        GlobalStates.toolsDockOpen = !GlobalStates.toolsDockOpen;
     }
 }
