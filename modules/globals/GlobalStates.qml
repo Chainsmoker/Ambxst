@@ -58,6 +58,21 @@ Singleton {
     property bool chatPanelOpen: false
     // Left edge news panel
     property bool newsPanelOpen: false
+    // Left edge tools dock
+    property bool toolsDockOpen: false
+
+    onNewsPanelOpenChanged: {
+        if (newsPanelOpen) {
+            toolsDockOpen = false;
+        }
+    }
+
+    onToolsDockOpenChanged: {
+        if (toolsDockOpen) {
+            newsPanelOpen = false;
+        }
+    }
+
     // Right edge dock (calendar + weather + pomodoro + color picker)
     property bool rightDockOpen: false
     readonly property var availableLayouts: ["dwindle", "master", "scrolling"]

@@ -114,6 +114,7 @@ Singleton {
         case "groq": return groqStrategy;
         case "ollama": return ollamaStrategy;
         case "minimax": return minimaxStrategy;
+        case "hermes": return openaiStrategy; // Nous Hermes local gateway is OpenAI-compatible
         case "custom": return openaiStrategy; // custom endpoints use OpenAI-compatible format by default
         default: return openaiStrategy;
         }
@@ -318,6 +319,11 @@ Singleton {
         currentChat = newChat;
         saveCurrentChat();
         makeRequest();
+    }
+
+    function stopGeneration() {
+        curlProcess.running = false;
+        isLoading = false;
     }
 
     function sendMessage(text, attachments) {
@@ -762,6 +768,14 @@ for f in files:
             fetchProcessGroq.running = true;
         }
 
+        // Hermes (local Nous agent gateway)
+        let hermesKey = KeyStore.getKey("hermes");
+        if (hermesKey) {
+            pendingFetches++;
+            fetchProcessHermes.command = ["bash", "-c", "curl -s -m 8 http://localhost:8642/v1/models -H 'Authorization: Bearer " + hermesKey + "'"];
+            fetchProcessHermes.running = true;
+        }
+
         // Ollama (local)
         let ollamaEnabled = KeyStore.hasKey("ollama");
         if (ollamaEnabled) {
@@ -933,6 +947,46 @@ for f in files:
                     }
                 } catch (e) {
                     console.log("Groq fetch error: " + e);
+                }
+            }
+            checkFetchCompletion();
+        }
+    }
+
+    Process {
+        id: fetchProcessHermes
+        stdout: StdioCollector {
+            id: fetchHermesOut
+        }
+        onExited: exitCode => {
+            if (exitCode === 0) {
+                try {
+                    let data = JSON.parse(fetchHermesOut.text);
+                    if (data.data) {
+                        let newModels = [];
+                        for (let i = 0; i < data.data.length; i++) {
+                            let id = data.data[i].id;
+                            let m = aiModelFactory.createObject(root, {
+                                name: "Hermes",
+                                description: "Nous Hermes local agent",
+                                endpoint: "http://localhost:8642/v1",
+                                model: id,
+                                provider: "hermes",
+                                requires_key: true,
+                                key_id: "HERMES_API_KEY"
+                            });
+                            if (m) newModels.push(m);
+                        }
+                        mergeModels(newModels);
+                        // Hermes is the dock's default chat model — select it deterministically
+                        // once available (user can still switch at runtime via /model).
+                        if (newModels.length > 0) {
+                            root.currentModel = newModels[0];
+                            root.isRestored = true;
+                        }
+                    }
+                } catch (e) {
+                    console.log("Hermes fetch error: " + e);
                 }
             }
             checkFetchCompletion();

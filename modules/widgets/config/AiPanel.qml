@@ -39,7 +39,7 @@ Item {
 
             // Providers
             Repeater {
-                model: ["gemini", "openai", "anthropic", "mistral", "groq", "ollama", "minimax"]
+                model: ["gemini", "openai", "anthropic", "mistral", "groq", "hermes", "ollama", "minimax"]
                 delegate: StyledRect {
                     required property string modelData
                     Layout.fillWidth: true

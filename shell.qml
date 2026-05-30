@@ -19,6 +19,7 @@ import qs.modules.widgets.presets
 import qs.modules.widgets.controlpanel
 import qs.modules.widgets.rightdock
 import qs.modules.widgets.leftdock
+import qs.modules.widgets.toolsdock
 import qs.modules.services
 import qs.modules.corners
 import qs.modules.frame
@@ -273,6 +274,22 @@ ShellRoot {
         }
     }
 
+    // ToolsDock — quick tools + AI chat feed
+    Variants {
+        model: {
+            const screens = Quickshell.screens;
+            const list = (Config.bar && Config.bar.screenList !== undefined ? Config.bar.screenList : []);
+            if (!list || list.length === 0)
+                return screens;
+            return screens.filter(screen => list.indexOf(screen.name) !== -1);
+        }
+
+        ToolsDock {
+            required property ShellScreen modelData
+            screen: modelData
+        }
+    }
+
     // Secure WlSessionLock lockscreen
     WlSessionLock {
         id: sessionLock
@@ -327,6 +344,7 @@ ShellRoot {
             }
         }
     }
+
 
     // Screenshot preview overlay
     Variants {
