@@ -558,55 +558,6 @@ PanelWindow {
                     }
                 }
 
-                // Pills de acción
-                Flow {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: 8
-
-                    Repeater {
-                        model: [
-                            { text: "Say Hi", prompt: "Hi! Tell me what you can do." },
-                            { text: "What Are You?", prompt: "Hi, explain what Ambxst shell is." },
-                            { text: "Clear", action: "clear" }
-                        ]
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            width: chipText.implicitWidth + 28
-                            height: 36
-                            radius: height / 2
-                            color: chipMouse.containsMouse ? Colors.primary : Colors.surfaceContainerHigh
-                            Behavior on color { ColorAnimation { duration: 150 } }
-
-                            Text {
-                                id: chipText
-                                anchors.centerIn: parent
-                                text: parent.modelData.text
-                                font.family: Config.theme.font
-                                font.capitalization: Font.Capitalize
-                                font.pixelSize: Styling.fontSize(-1)
-                                font.weight: Font.Medium
-                                color: chipMouse.containsMouse ? Colors.overPrimary : Colors.overBackground
-                            }
-
-                            MouseArea {
-                                id: chipMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (parent.modelData.action === "clear") {
-                                        Ai.createNewChat();
-                                    } else if (parent.modelData.prompt) {
-                                        Ai.sendMessage(parent.modelData.prompt);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 Item { Layout.fillHeight: true }
             }
 
