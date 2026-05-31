@@ -330,38 +330,64 @@ PanelWindow {
                 return 0.10 + 0.90 * v; // 0.10..1
             }
 
-            // Envolvente espectral: graves (izq) pegan más fuerte que agudos (der),
-            // para que el movimiento se sienta como un analizador real, no plano.
-            function spectrumWeight(i) {
-                var t = i / Math.max(1, barCount - 1);
-                return 0.40 + 0.60 * Math.pow(1 - t, 0.7);
-            }
-
             readonly property int barCount: Math.max(24, Math.floor(width / 9))
             readonly property real slot: barCount > 0 ? width / barCount : 9
 
-            // Niveles vivos por barra (simulación CAVA). Un Timer empuja cada
-            // barra hacia un objetivo aleatorio con ataque rápido / caída lenta;
-            // el Behavior on height interpola entre ticks para que fluya.
+            // ── Simulación de espectro tipo CAVA ──────────────────────────────
+            // Cada banda tiene su propia frecuencia/fase (no uniforme). Los graves
+            // (izq) son lentos y potentes; los agudos (der) nerviosos y cortos.
+            // Sumamos varios osciladores + un golpe de "energía" global pseudo-
+            // aleatorio, y aplicamos gravedad (caída lenta) sobre el pico previo.
+            property real phase: 0
+            property real energy: 0.5
             property var levels: []
-            onBarCountChanged: levels = []
+            property var peaks: []
+            onBarCountChanged: { levels = []; peaks = []; }
+
+            function rand01(seed) {
+                var s = Math.sin(seed * 12.9898) * 43758.5453;
+                return s - Math.floor(s); // hash determinista 0..1
+            }
 
             function tick() {
                 var n = barCount;
-                var prev = (levels.length === n) ? levels : null;
-                var arr = new Array(n);
+                // Energía global con caminata aleatoria suave → simula la dinámica
+                // de la canción (estrofas suaves, drops fuertes).
+                energy += (Math.random() - 0.5) * 0.5;
+                if (energy < 0.15) energy = 0.15;
+                if (energy > 1.0) energy = 1.0;
+                phase += 0.18;
+
+                var prevP = (peaks.length === n) ? peaks : null;
+                var lv = new Array(n);
+                var pk = new Array(n);
                 for (var i = 0; i < n; i++) {
-                    var target = Math.random() * Math.random() * spectrumWeight(i);
-                    var cur = prev ? prev[i] : 0;
-                    // ataque (sube) más rápido que la caída (baja) → rebote tipo CAVA
-                    var k = (target > cur) ? 0.65 : 0.30;
-                    arr[i] = cur + (target - cur) * k;
+                    var t = i / Math.max(1, n - 1);
+                    // Envolvente: graves pegan más que agudos (curva descendente).
+                    var env = 0.45 + 0.55 * Math.pow(1 - t, 0.8);
+                    // Velocidad por banda: agudos vibran más rápido que graves.
+                    var spd = 0.6 + 3.4 * t;
+                    var ph = waveCard.rand01(i + 1) * 6.283;
+                    // Mezcla de osciladores desfasados → forma irregular, no senoidal limpia.
+                    var osc = 0.5
+                            + 0.30 * Math.sin(phase * spd + ph)
+                            + 0.20 * Math.sin(phase * spd * 1.7 + ph * 2.1);
+                    // Chispa aleatoria ocasional (transientes / percusión).
+                    var spark = (Math.random() < 0.06) ? Math.random() * 0.5 : 0;
+                    var target = Math.max(0, Math.min(1, env * energy * osc + spark));
+
+                    // Gravedad: sube al instante, cae despacio (rebote tipo CAVA).
+                    var prev = prevP ? prevP[i] : 0;
+                    var val = (target >= prev) ? target : Math.max(target, prev - 0.06);
+                    pk[i] = val;
+                    lv[i] = val;
                 }
-                levels = arr;
+                peaks = pk;
+                levels = lv;
             }
 
             Timer {
-                interval: 70
+                interval: 45
                 repeat: true
                 running: dock.isOpen && dock.isPlaying
                 onTriggered: waveCard.tick()
@@ -374,7 +400,7 @@ PanelWindow {
                     required property int index
                     readonly property bool played: (index + 0.5) / waveCard.barCount <= dock.progress
                     readonly property real lvl: (waveCard.levels[index] !== undefined) ? waveCard.levels[index] : 0
-                    readonly property real amp: dock.isPlaying ? (0.12 + 0.88 * lvl) : waveCard.waveBase(index)
+                    readonly property real amp: dock.isPlaying ? (0.08 + 0.92 * lvl) : waveCard.waveBase(index)
                     width: Math.max(3, waveCard.slot * 0.42)
                     radius: width / 2
                     height: Math.max(width, waveCard.height * amp)
@@ -383,7 +409,7 @@ PanelWindow {
                     color: wbar.played
                         ? Colors.primary
                         : Qt.rgba(Colors.overBackground.r, Colors.overBackground.g, Colors.overBackground.b, 0.28)
-                    Behavior on height { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+                    Behavior on height { NumberAnimation { duration: 55; easing.type: Easing.OutQuad } }
                     Behavior on color { ColorAnimation { duration: 160 } }
                 }
             }
